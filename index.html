@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Show Monopoly</title>
+<style>
+html,body{margin:0;height:100%;background:#050213;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh;outline:none;touch-action:none}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#143e2c,#050213 70%);color:#e6b85f;font:600 22px/1.4 system-ui,sans-serif;letter-spacing:.04em}
+#loading[hidden]{display:none}
+</style>
+<link id='-gd-engine-icon' rel='icon' type='image/png' href='index.icon.png' />
+<link rel='apple-touch-icon' href='index.apple-touch-icon.png'/>
+
+</head>
+<body>
+<canvas id="canvas" tabindex="0" aria-label="Show Monopoly: quatro cartelas, globo dourado e três cofres">Este jogo requer WebGL.</canvas>
+<div id="loading" role="status">Carregando o jogo…</div>
+<script src="index.js"></script>
+<script>
+const loading = document.getElementById('loading');
+window.onPotionState = function (state) { loading.hidden = true; window.potionState = state; };
+const engine = new Engine({"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":12528416,"index.wasm":19761972},"focusCanvas":true,"gdnativeLibs":[]});
+engine.startGame({
+  canvas: document.getElementById('canvas'),
+  canvasResizePolicy: 2,
+  focusCanvas: true,
+  onProgress: function (current, total) { if (total) loading.textContent = 'Carregando… ' + Math.floor(current / total * 100) + '%'; }
+}).catch(function (e) { loading.hidden = false; loading.textContent = 'Falha ao iniciar: ' + e.message; console.error(e); });
+</script>
+</body>
+</html>
+

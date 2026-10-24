@@ -1,0 +1,156 @@
+extends SceneTree
+# Godot 3.6 integration smoke: --no-window --script tests/test_scene.gd
+var scene
+var failures = 0
+var original_denomination = 10
+var settings_existed = false
+var settings_bytes = PoolByteArray()
+
+func _init():
+	call_deferred("setup")
+
+func check(condition, message):
+	if not condition:
+		failures += 1
+		printerr("FAIL scene: " + message)
+
+func capture(name):
+	var shot = get_root().get_texture().get_data()
+	shot.flip_y()
+	check(shot.save_png("res://tests/" + name + ".png") == OK, "Save screenshot " + name)
+
+func ordered_deck():
+	var deck = []
+	for number in range(1, 76):
+		deck.append(number)
+	return deck
+
+func set_controlled_cards(first):
+	var card = []
+	for number in range(first, first + 15):
+		card.append(number)
+	scene.game.cards = [card.duplicate(), card.duplicate(), card.duplicate(), card.duplicate()]
+	scene.game.deck = ordered_deck()
+	scene.refresh()
+
+func setup():
+	var settings_file = File.new()
+	settings_existed = settings_file.file_exists("user://settings.cfg")
+	if settings_existed:
+		if settings_file.open("user://settings.cfg", File.READ) != OK:
+			printerr("FAIL scene: Cannot back up existing user settings")
+			quit(1)
+			return
+		settings_bytes = settings_file.get_buffer(settings_file.get_len())
+		settings_file.close()
+	scene = load("res://Main.tscn").instance()
+	get_root().add_child(scene)
+	original_denomination = scene.game.denomination
+	yield(create_timer(0.3), "timeout")
+	check(scene.cells.size() == 4 and scene.initial_balls.size() == 30 and scene.extra_balls.size() == 10, "Complete playing board")
+	scene.toggle_card(0)
+	check(not scene.game.card_enabled[0] and "FECHADA" in scene.card_buttons[0].text, "Closed card is visibly marked")
+	scene.toggle_card(0)
+	var previous_speed = scene.speed_index
+	scene.cycle_speed()
+	check(scene.speed_index == (previous_speed + 1) % 3 and is_equal_approx(scene.timer.wait_time, scene.speed), "Speed changes actual draw interval")
+	scene.speed_index = 1
+	scene.apply_speed()
+	scene.sound_enabled = true
+	scene.audio.set_enabled(true)
+	scene.audio.play_cue("cards")
+	check(scene.audio.voices[scene.audio.cursor - 1][0].playing, "HAR sound stream starts")
+	yield(create_timer(0.3), "timeout")
+	check(not scene.audio.voices[scene.audio.cursor - 1][0].playing, "Audio sprite stops at cue boundary")
+	scene.toggle_sound()
+	scene.audio.play_cue("start")
+	for voice in scene.audio.voices:
+		check(not voice[0].playing, "Mute prevents sound playback")
+	scene.toggle_sound()
+	capture("preview-ready")
+	for _index in range(25):
+		scene.decrease_bet()
+	check(scene.game.bet == 1 and scene.minus_button.disabled, "Minimum bet button")
+	for _index in range(25):
+		scene.increase_bet()
+	check(scene.game.bet == 20 and scene.plus_button.disabled, "Maximum bet button")
+	scene.game.set_bet(1)
+	scene.refresh()
+	scene.open_menu()
+	check(scene.menu_open and scene.menu_shade.visible and scene.settings.visible, "Menu visible")
+	var balance = scene.game.credits
+	scene.play()
+	scene.increase_bet()
+	check(scene.game.phase == "ready" and scene.game.credits == balance and scene.game.bet == 1, "Menu blocks play and bet changes")
+	yield(create_timer(0.15), "timeout")
+	capture("preview-menu")
+	scene.coin_twentyfive()
+	check(scene.game.denomination == 25 and not scene.menu_open, "Menu selects twenty-five cents")
+	scene.open_menu()
+	scene.coin_ten()
+	check(scene.game.denomination == 10 and not scene.menu_shade.visible, "Menu selects ten cents")
+	scene.game.set_denomination(original_denomination)
+	scene.refresh()
+	scene.play()
+	scene.timer.stop()
+	set_controlled_cards(61)
+	check(scene.game.phase == "drawing" and scene.game.credits == balance - 1, "Play debits initial stake")
+	scene.open_menu()
+	scene.coin_twentyfive()
+	scene.increase_bet()
+	check(not scene.menu_open and scene.game.denomination == original_denomination and scene.game.bet == 1, "Drawing blocks menu, coin and bet changes")
+	for _index in range(12):
+		scene.draw_ball()
+	yield(create_timer(0.25), "timeout")
+	capture("preview-progress")
+	for _index in range(18):
+		scene.draw_ball()
+	check(scene.game.drawn.size() == 30 and scene.game.phase == "extras" and scene.timer.is_stopped(), "Initial draw ends at thirty")
+	scene.open_menu()
+	check(not scene.menu_open, "Extras block menu")
+	scene.buy_extra()
+	check(scene.extra_animating and scene.game.extras_bought == 1 and scene.extra_button.disabled, "Extra animation begins and disables purchase")
+	scene.buy_extra()
+	scene.play()
+	check(scene.game.drawn.size() == 31 and scene.game.credits == balance - 2 and scene.game.phase == "extras", "Double purchase and finalize blocked during animation")
+	yield(create_timer(0.85), "timeout")
+	check(not scene.extra_animating and not scene.extra_button.disabled, "Real extra timer unlocks purchase")
+	for _index in range(9):
+		scene.buy_extra()
+		yield(create_timer(0.8), "timeout")
+	check(scene.game.drawn.size() == 40 and scene.game.extras_bought == 10 and scene.game.phase == "finished", "Ten extras complete round")
+	check(scene.game.credits == balance - 11 and not scene.extra_animating, "All extra charges and timers complete")
+	scene.buy_extra()
+	check(scene.game.drawn.size() == 40 and scene.game.credits == balance - 11, "Eleventh extra rejected")
+	scene.refresh("40 bolas sorteadas. Rodada concluída!")
+	yield(create_timer(0.2), "timeout")
+	capture("preview-extras")
+	scene.reset_demo()
+	scene.play()
+	scene.timer.stop()
+	set_controlled_cards(16)
+	for _index in range(30):
+		scene.draw_ball()
+	check(scene.game.jackpot_won and scene.game.phase == "finished" and scene.win_age >= 0, "Jackpot starts celebration")
+	check(scene.game.credits == 999 + int(500000 / original_denomination), "Jackpot UI balance")
+	check("ACUMULADO" in scene.status_label.text and scene.timer.is_stopped(), "Jackpot announced and draw timer stopped")
+	yield(create_timer(0.4), "timeout")
+	capture("preview-win")
+	scene.reset_demo()
+	scene.game.set_denomination(original_denomination)
+	scene.refresh()
+	# Restore the exact settings file, including any unrelated existing keys.
+	if settings_existed:
+		check(settings_file.open("user://settings.cfg", File.WRITE) == OK, "Restore settings file")
+		if settings_file.is_open():
+			settings_file.store_buffer(settings_bytes)
+			settings_file.close()
+	else:
+		var directory = Directory.new()
+		if directory.file_exists("user://settings.cfg"):
+			check(directory.remove("user://settings.cfg") == OK, "Remove temporary settings")
+	yield(create_timer(0.3), "timeout")
+	check(not scene.menu_open and not scene.menu_shade.visible and scene.game.phase == "ready", "Final preview is complete unobstructed board")
+	capture("preview")
+	print("Potion Master scene: " + str(failures) + " failure(s)")
+	quit(0 if failures == 0 else 1)

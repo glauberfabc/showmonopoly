@@ -1,0 +1,20 @@
+{
+  "sounds": 399,
+  "audio_files": 225,
+  "groups": {
+    "Ace Base · Joker": 30,
+    "Ace Base · bingo": 66,
+    "Ace Base · interface": 26,
+    "Interface": 1,
+    "Pachinko 3": 40,
+    "Potion Master · jackpot": 1,
+    "Potion Master · jogo": 60,
+    "Show Ball 3": 26,
+    "Triple Bonus · Joker": 30,
+    "Triple Bonus · bingo": 76,
+    "Triple Bonus · interface": 26,
+    "Triple Bonus · slot": 17
+  },
+  "status": "validated",
+  "game_tests": "150 random rounds: 0 failures"
+}

@@ -1,0 +1,97 @@
+extends SceneTree
+# Real viewport pixel comparisons; run with a graphics-capable Godot 3.6 binary.
+var scene
+var failures = 0
+
+func _init():
+	call_deferred("run")
+
+func check(condition, message):
+	if condition:
+		print("PASS animation: " + message)
+	else:
+		failures += 1
+		printerr("FAIL animation: " + message)
+
+func capture(filename):
+	var image = get_root().get_texture().get_data()
+	image.flip_y()
+	if filename != "":
+		check(image.save_png("res://tests/" + filename + ".png") == OK, "Saved " + filename)
+	return image
+
+# Input regions are in the reference artwork's 1024x1536 coordinate system.
+# Resolve against actual viewport output, normally 640x960 in this project.
+func difference(first, second, region, threshold = 0.025):
+	var sx = float(first.get_width()) / 1024.0
+	var sy = float(first.get_height()) / 1536.0
+	var changed = 0
+	var count = 0
+	var total = 0.0
+	first.lock()
+	second.lock()
+	for y in range(int(region.position.y * sy), int(region.end.y * sy), 4):
+		for x in range(int(region.position.x * sx), int(region.end.x * sx), 4):
+			var a = first.get_pixel(x, y)
+			var b = second.get_pixel(x, y)
+			var distance = Vector3(a.r - b.r, a.g - b.g, a.b - b.b).length()
+			total += distance
+			count += 1
+			if distance > threshold:
+				changed += 1
+	first.unlock()
+	second.unlock()
+	return {"changed": changed, "samples": count, "fraction": float(changed) / max(1, count), "mean": total / max(1, count)}
+
+func run():
+	scene = load("res://Main.tscn").instance()
+	get_root().add_child(scene)
+	yield(create_timer(0.25), "timeout")
+	yield(VisualServer, "frame_post_draw")
+	var initial = capture("")
+	check(initial.get_width() > 0 and initial.get_height() > 0, "Viewport produced real image %dx%d" % [initial.get_width(), initial.get_height()])
+	for pot in scene.pots:
+		pot.fill_amount = 0.0
+		pot.target_fill = 0.0
+		pot.update()
+	yield(VisualServer, "frame_post_draw")
+	var empty = capture("animation-empty")
+	for pot in scene.pots:
+		pot.set_fill(1.0)
+	yield(create_timer(1.4), "timeout")
+	yield(VisualServer, "frame_post_draw")
+	var filled = capture("animation-filled")
+	var regions = [Rect2(125, 242, 134, 74), Rect2(435, 278, 154, 49), Rect2(757, 243, 134, 74)]
+	for i in range(3):
+		var result = difference(empty, filled, regions[i])
+		print("Potion %d pixels: %s" % [i, str(result)])
+		check(result.fraction > 0.35 and result.mean > 0.08, "Potion %d visibly fills its liquid area" % i)
+	# Freeze level at full while retaining shader, bubble and vapor animation.
+	for pot in scene.pots:
+		pot.fill_amount = 1.0
+		pot.target_fill = 1.0
+	scene.machine.set_spinning(true)
+	yield(create_timer(0.15), "timeout")
+	yield(VisualServer, "frame_post_draw")
+	var motion_start = capture("")
+	yield(create_timer(0.4), "timeout")
+	yield(VisualServer, "frame_post_draw")
+	var motion_end = capture("animation-motion")
+	var smoke = difference(motion_start, motion_end, Rect2(100, 50, 170, 115), 0.006)
+	print("Smoke pixels: " + str(smoke))
+	check(smoke.changed >= 2 and smoke.mean > 0.0002, "Vapor region changes between actual rendered frames")
+	var orbit = difference(motion_start, motion_end, Rect2(390, 630, 250, 220))
+	print("Machine pixels: " + str(orbit))
+	check(orbit.fraction > 0.045 and orbit.mean > 0.01, "Orbital balls visibly move")
+	# Stop orbital animation to isolate the newly revealed number's pixel change.
+	scene.machine.set_process(false)
+	yield(VisualServer, "frame_post_draw")
+	var before_reveal = capture("")
+	scene.machine.reveal_ball(42)
+	yield(VisualServer, "frame_post_draw")
+	var after_reveal = capture("animation-reveal")
+	var reveal = difference(before_reveal, after_reveal, Rect2(390, 630, 250, 270))
+	print("Reveal pixels: " + str(reveal))
+	check(scene.machine.last_ball == 42 and reveal.changed >= 4, "Reveal 42 changes visible machine pixels")
+	print("Animation render test: %d failure(s)" % failures)
+	quit(1 if failures else 0)

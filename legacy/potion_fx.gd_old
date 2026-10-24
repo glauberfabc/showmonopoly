@@ -1,0 +1,98 @@
+extends Node2D
+# Godot 3.6: procedural potion vessel; coordinates centered on the vessel.
+var potion_color = Color(0.3, 0.9, 0.45)
+var fill_amount = 0.12
+var target_fill = 0.12
+var time = 0.0
+var bubbles = []
+
+func _ready():
+	for i in range(18):
+		bubbles.append(Vector3(rand_range(-62, 62), rand_range(0, 1), rand_range(2, 6)))
+	set_process(true)
+
+func configure(color: Color):
+	potion_color = color
+	update()
+
+func set_fill(value):
+	target_fill = clamp(float(value), 0.0, 1.0)
+
+func _process(delta):
+	time += delta
+	fill_amount = lerp(fill_amount, target_fill, min(delta * 2.8, 1.0))
+	update()
+
+func _draw():
+	# Halo under the crystal flask.
+	for i in range(5, 0, -1):
+		draw_ellipse(Vector2(0, 72), Vector2(72 + i * 6, 10 + i * 2), Color(potion_color.r, potion_color.g, potion_color.b, 0.025))
+	draw_ellipse(Vector2(0, 76), Vector2(85, 15), Color(0.015, 0.005, 0.025, 0.65))
+	var silhouette = PoolVector2Array([Vector2(-31,-79), Vector2(31,-79), Vector2(31,-47), Vector2(62,-30), Vector2(82,-3), Vector2(89,30), Vector2(80,58), Vector2(60,72), Vector2(-60,72), Vector2(-80,58), Vector2(-89,30), Vector2(-82,-3), Vector2(-62,-30), Vector2(-31,-47)])
+	draw_colored_polygon(silhouette, Color(0.055, 0.04, 0.105, 0.92))
+	# Liquid polygon clipped to the lower round silhouette.
+	var surface = lerp(65.0, -33.0, fill_amount)
+	var liquid = PoolVector2Array()
+	var width = vessel_width(surface)
+	for i in range(25):
+		var x = lerp(-width, width, float(i) / 24.0)
+		liquid.append(Vector2(x, surface + sin(x * 0.064 + time * 2.7) * 2.0))
+	for i in range(1, 21):
+		var y = lerp(surface, 65.0, float(i) / 20.0)
+		liquid.append(Vector2(vessel_width(y), y))
+	for i in range(20, -1, -1):
+		var y = lerp(surface, 65.0, float(i) / 20.0)
+		liquid.append(Vector2(-vessel_width(y), y))
+	draw_colored_polygon(liquid, potion_color.darkened(0.32))
+	for i in range(6):
+		var y = lerp(surface + 4, 63.0, float(i) / 5.0)
+		draw_line(Vector2(-vessel_width(y) + 5, y), Vector2(vessel_width(y) - 5, y), Color(potion_color.r, potion_color.g, potion_color.b, 0.16), 8)
+	draw_ellipse(Vector2(0, surface), Vector2(width, 5), potion_color.lightened(0.3))
+	# Bubbles rise through the available liquid height and break on its surface.
+	for i in range(bubbles.size()):
+		var bubble = bubbles[i]
+		var phase = fmod(bubble.y + time * (0.13 + float(i % 4) * 0.027), 1.0)
+		var y = lerp(62.0, surface + 3.0, phase)
+		var x = clamp(bubble.x + sin(time * 2 + i) * 4, -vessel_width(y) + 9, vessel_width(y) - 9)
+		draw_circle(Vector2(x, y), bubble.z, Color(1, 1, 0.85, 0.17 + phase * 0.2))
+		draw_arc(Vector2(x, y), bubble.z, PI, PI * 1.7, 10, potion_color.lightened(0.65), 1, true)
+	# Glass rim, bright facets, brass neck.
+	var outline = silhouette
+	outline.append(outline[0])
+	draw_polyline(outline, Color(0.65, 0.84, 0.9, 0.65), 3, true)
+	draw_line(Vector2(-71,-16), Vector2(-79,18), Color(0.8, 0.96, 1, 0.52), 6, true)
+	draw_line(Vector2(-79,25), Vector2(-73,44), Color(0.8, 0.96, 1, 0.35), 4, true)
+	draw_arc(Vector2(0,22), 75, 0.1, 0.55, 12, Color(0.7,0.95,1,0.3), 3, true)
+	draw_rect(Rect2(-37,-84,74,15), Color(0.39,0.21,0.07))
+	draw_rect(Rect2(-39,-86,78,5), Color(0.93,0.72,0.3))
+	draw_rect(Rect2(-37,-71,74,4), Color(0.85,0.59,0.16))
+	draw_ellipse(Vector2(0,-86), Vector2(32,5), Color(0.10,0.055,0.10))
+	# Translucent puffs curl upward from the open neck.
+	for i in range(9):
+		var phase = fmod(time * 0.22 + float(i) / 9, 1.0)
+		var x = sin(phase * 6 + time * 0.8 + i) * (7 + phase * 15)
+		var y = -89 - phase * 52
+		var alpha = sin(phase * PI) * (0.10 + fill_amount * 0.1)
+		draw_circle(Vector2(x,y), 5 + phase * 10, Color(potion_color.r * 0.5 + 0.5, potion_color.g * 0.5 + 0.5, potion_color.b * 0.5 + 0.5, alpha))
+	if fill_amount > 0.88:
+		for i in range(6):
+			var angle = time * 0.3 + i * TAU / 6
+			var p = Vector2(cos(angle) * 102, sin(angle) * 65)
+			var size = 2 + sin(time * 5 + i) * 1.6
+			draw_line(p - Vector2(size, 0), p + Vector2(size, 0), Color(1,0.94,0.62,0.8), 1.5, true)
+			draw_line(p - Vector2(0, size), p + Vector2(0, size), Color(1,0.94,0.62,0.8), 1.5, true)
+
+func vessel_width(y):
+	if y < 0:
+		return lerp(58.0, 78.0, clamp((y + 33.0) / 33.0, 0, 1))
+	if y < 32:
+		return lerp(78.0, 83.0, y / 32.0)
+	return lerp(83.0, 58.0, clamp((y - 32.0) / 33.0, 0, 1))
+
+func draw_ellipse(center, axes, color):
+	var points = PoolVector2Array()
+	for i in range(48):
+		var a = float(i) * TAU / 48.0
+		points.append(center + Vector2(cos(a) * axes.x, sin(a) * axes.y))
+	draw_colored_polygon(points, color)
+

@@ -1,0 +1,100 @@
+extends SceneTree
+# Dispatch actual GUI mouse events through the viewport; no direct button methods.
+var failures = 0
+var scene
+var settings_existed = false
+var settings_bytes = PoolByteArray()
+
+func _init():
+	call_deferred("setup")
+
+func check(condition, message):
+	if not condition:
+		failures += 1
+		printerr("FAIL input: " + message)
+
+func click_at(position):
+	# Viewport.input consumes canvas-local coordinates. Handle events locally so
+	# each synthetic press/release gets a fresh handled flag, as SceneTree does.
+	get_root().handle_input_locally = true
+	var motion = InputEventMouseMotion.new()
+	motion.position = position
+	motion.global_position = position
+	get_root().input(motion)
+	var press = InputEventMouseButton.new()
+	press.position = position
+	press.global_position = position
+	press.button_index = BUTTON_LEFT
+	press.pressed = true
+	get_root().input(press)
+	var release = InputEventMouseButton.new()
+	release.position = position
+	release.global_position = position
+	release.button_index = BUTTON_LEFT
+	release.pressed = false
+	get_root().input(release)
+
+func setup():
+	var settings_file = File.new()
+	settings_existed = settings_file.file_exists("user://settings.cfg")
+	if settings_existed:
+		if settings_file.open("user://settings.cfg", File.READ) != OK:
+			printerr("FAIL input: Cannot back up settings")
+			quit(1)
+			return
+		settings_bytes = settings_file.get_buffer(settings_file.get_len())
+		settings_file.close()
+	scene = load("res://Main.tscn").instance()
+	get_root().add_child(scene)
+	yield(create_timer(0.3), "timeout")
+	click_at(Vector2(643, 1418))
+	check(scene.game.bet == 2, "Actual plus hitbox increases bet")
+	click_at(Vector2(379, 1418))
+	check(scene.game.bet == 1, "Actual minus hitbox decreases bet")
+	click_at(Vector2(946, 35))
+	yield(create_timer(0.1), "timeout")
+	check(scene.menu_open and scene.settings.visible, "Actual MENU hitbox opens settings")
+	var balance = scene.game.credits
+	click_at(Vector2(860, 1410))
+	yield(create_timer(0.1), "timeout")
+	check(scene.game.phase == "ready" and scene.game.credits == balance, "Modal shade intercepts underlying JOGAR")
+	click_at(Vector2(680, 575))
+	yield(create_timer(0.1), "timeout")
+	check(scene.game.denomination == 25 and not scene.menu_open, "Actual R$0.25 hitbox changes denomination")
+	var persisted = ConfigFile.new()
+	check(persisted.load("user://settings.cfg") == OK and persisted.get_value("game", "denomination", -1) == 25, "Selected denomination persisted on disk")
+	var reloaded = load("res://Main.tscn").instance()
+	get_root().add_child(reloaded)
+	check(reloaded.game.denomination == 25, "New game instance restores saved denomination")
+	get_root().remove_child(reloaded)
+	reloaded.free()
+	click_at(Vector2(860, 1410))
+	yield(create_timer(0.1), "timeout")
+	check(scene.game.phase == "drawing" and scene.game.credits == balance - scene.game.bet and not scene.timer.is_stopped(), "Actual JOGAR hitbox starts paid round")
+	# Exercise automatic Timer -> timeout -> draw_ball dispatch, accelerated only
+	# to keep this test short. Keep the jackpot branch for the separate scene test.
+	scene.game.deck.clear()
+	for number in range(1, 76):
+		scene.game.deck.append(number)
+	for card in scene.game.cards:
+		if not 75 in card:
+			card[14] = 75
+	scene.timer.start(0.025)
+	yield(create_timer(1.2), "timeout")
+	check(scene.game.drawn.size() == 30 and scene.game.phase == "extras" and scene.timer.is_stopped(), "Thirty automatic timer draws stop at extras")
+	click_at(Vector2(842, 1230))
+	check(scene.game.drawn.size() == 31 and scene.game.credits == balance - 2, "Actual extra panel purchases one ball")
+	yield(create_timer(0.8), "timeout")
+	click_at(Vector2(860, 1410))
+	check(scene.game.phase == "finished", "Actual FINALIZAR button ends extras phase")
+	if settings_existed:
+		check(settings_file.open("user://settings.cfg", File.WRITE) == OK, "Restore input-test settings")
+		if settings_file.is_open():
+			settings_file.store_buffer(settings_bytes)
+			settings_file.close()
+	else:
+		var directory = Directory.new()
+		if directory.file_exists("user://settings.cfg"):
+			check(directory.remove("user://settings.cfg") == OK, "Remove input-test settings")
+	print("Potion Master GUI input: " + str(failures) + " failure(s)")
+	quit(0 if failures == 0 else 1)

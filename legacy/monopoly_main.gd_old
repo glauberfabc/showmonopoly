@@ -1,0 +1,211 @@
+extends "res://scripts/board_main.gd"
+
+const BASE_ART = preload("res://assets/monopoly-base.png")
+const BONUS_ART = preload("res://assets/monopoly-bonus.png")
+const SYMBOL_ART = preload("res://assets/monopoly-symbols.png")
+const STRIP = 100
+var ball_audio_age = 0.0
+var announced_win = 0
+var bonus_intro = 0.0
+
+func _ready():
+	draw_legacy_board = false
+	status_message = "SHOW MONOPOLY · Escolha a aposta e jogue."
+	refresh()
+
+func art_control(key, rect, caption = ""):
+	var b = controls[key]
+	b.rect_position = rect.position + Vector2(0, STRIP)
+	b.rect_size = rect.size
+	b.text = caption
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var s = StyleBoxFlat.new()
+		s.bg_color = Color(0, 0.2, 0.06, 0.88) if caption != "" else Color(0, 0, 0, 0)
+		s.set_corner_radius_all(20)
+		if state in ["hover", "focus"]:
+			s.border_color = gold
+			s.set_border_width_all(2)
+		b.add_stylebox_override(state, s)
+
+func refresh():
+	.refresh()
+	for key in ["cards", "sound", "menu", "minus", "plus", "play", "extra", "coin", "reset", "preview"]:
+		controls[key].visible = modal_kind == ""
+	art_control("play", Rect2(704, 1355, 288, 124), "FINALIZAR" if game.phase == "extras" else ("SORTEANDO" if busy else ""))
+	art_control("extra", Rect2(704, 1160, 280, 155))
+	art_control("minus", Rect2(347, 1382, 72, 83))
+	art_control("plus", Rect2(609, 1380, 73, 85))
+	var compact = {"cards":Rect2(10,0,223,36), "sound":Rect2(784,0,106,36), "menu":Rect2(895,0,119,36), "coin":Rect2(8,1491,221,37), "reset":Rect2(239,1491,287,37), "preview":Rect2(536,1491,480,37)}
+	for key in compact:
+		controls[key].rect_position = compact[key].position + Vector2(0,STRIP)
+		controls[key].rect_size = compact[key].size
+		controls[key].add_font_override("font", font(17))
+	if modal_kind == "bonus" and controls.has("spin"):
+		art_control("spin",Rect2(704,1282,286,136),"VOLTAR" if game.bonus.spins_left == 0 else ("GIRANDO" if spin_time > 0 else ""))
+	elif modal_kind in ["rules", "joker"]:
+		for b in modal_buttons:
+			# New buttons are made by open_modal at unshifted positions.
+			if not b.has_meta("strip_shifted"):
+				b.rect_position.y += STRIP
+				b.set_meta("strip_shifted",true)
+
+func _draw_paytable():
+	draw_rect(Rect2(0,0,1024,100),Color("1a2445"))
+	for i in range(game.patterns.size()):
+		var x = 8 + i * 84
+		box(Rect2(x,4,81,91),Color("344b82"),gold,3)
+		if i < 2:
+			text("BÔNUS",Rect2(x,2,81,17),13,gold)
+		for n in range(15):
+			draw_rect(Rect2(x+7+(n%5)*13.5,23+int(n/5)*12,11,10),Color("b61c22") if n in game.patterns[i].cells else Color("151a20"))
+		text("×"+str(game.patterns[i].pay),Rect2(x,62,81,29),21,Color.white)
+
+func _draw():
+	_draw_paytable()
+	draw_set_transform(Vector2(0,STRIP),0,Vector2.ONE)
+	if modal_kind == "bonus":
+		_draw_bonus_art()
+	else:
+		_draw_base_art()
+		if modal_kind in ["rules", "joker"]:
+			_draw_modal()
+
+func _jackpot_values():
+	for i in range(3):
+		text(money(game.bonus.JACKPOT_CENTS[i]),Rect2(205+i*213,254,194,44),29,gold)
+
+func _draw_base_art():
+	draw_texture_rect(BASE_ART,Rect2(0,0,1024,1536),false)
+	_jackpot_values()
+	for c in range(4):
+		var x = 89 if c%2 == 0 else 706
+		var y = 667 if c < 2 else 908
+		for n in range(15):
+			var r = Rect2(x+(n%5)*46.2,y+int(n/5)*43.5,46.2,43.5)
+			var hit = game.cards[c][n] in game.drawn
+			draw_rect(r,colors[c].lightened(0.1) if hit else Color("f8e6c3"))
+			draw_rect(r,Color("6e4d29"),false,1.2)
+			text("%02d"%game.cards[c][n],Rect2(r.position.x,r.position.y+3,r.size.x,35),27,Color("261a0e"))
+	var center = Vector2(512,726)
+	for i in range(16):
+		var angle = i*2.4+elapsed*(5 if busy else 0.8)
+		var pos = center+Vector2(cos(angle)*92,sin(angle*1.13)*84)*(0.42+0.035*i)
+		draw_circle(pos+Vector2(2,3),17,Color(0,0,0,0.25))
+		draw_circle(pos,16,cream)
+		text(str((i*7)%90+1),Rect2(pos.x-16,pos.y-11,32,24),14,ink)
+	# Restore the front central golden cage over the moving balls.
+	draw_texture_rect_region(BASE_ART,Rect2(374,710,282,61),Rect2(374,710,282,61))
+	draw_texture_rect_region(BASE_ART,Rect2(473,710,84,89),Rect2(473,710,84,89))
+	if busy:
+		for event in game.ball_events:
+			if event.collected:
+				var t = clamp(reveal_time/2.0,0,1)
+				var pos = center.linear_interpolate(Vector2(212+event.color*322,490),t)
+				draw_circle(pos,21,colors[event.color])
+				text(str(event.number),Rect2(pos.x-20,pos.y-13,40,28),18,ink)
+		for color in range(3):
+			if _has_collected(color):
+				draw_arc(Vector2(215+color*322,495),35+sin(elapsed*15)*5,0,TAU,40,colors[color],5)
+	for n in range(40):
+		var pos = Vector2(86+(n%10)*59,1171+int(n/10)*57) if n<30 else Vector2(738+((n-30)%5)*51,1203+int((n-30)/5)*65)
+		var col = Color("b4964f").darkened(0.42)
+		if n < game.ball_events.size():
+			col = Color("f0cf70") if game.ball_events[n].color<0 else colors[game.ball_events[n].color]
+		draw_circle(pos+Vector2(1,3),24,Color(0,0,0,0.32))
+		draw_circle(pos,23,col)
+		draw_circle(pos+Vector2(-6,-7),7,Color(1,1,0.8,0.18))
+		if n<game.drawn.size():
+			text("%02d"%game.drawn[n],Rect2(pos.x-23,pos.y-16,46,35),25,Color("382309"))
+	text(money(game.credits*game.denomination),Rect2(76,1410,238,54),31,gold)
+	text(str(game.bet),Rect2(427,1408,171,53),40,gold)
+	text("EXTRA: "+money(game.extra_quote()*game.denomination),Rect2(704,1296,280,28),18,Color("fff1b0"))
+	box(Rect2(70,1320,900,25),Color(0,0.1,0.02,0.9),Color(0,0,0,0),3)
+	text(status_message,Rect2(75,1320,890,25),15,cream)
+
+func _draw_bonus_art():
+	draw_texture_rect(BONUS_ART,Rect2(0,0,1024,1536),false)
+	_jackpot_values()
+	for i in range(3):
+		if not game.bonus.flags[i]:
+			var r = Rect2(75+i*322,332,292,250)
+			draw_texture_rect_region(BASE_ART,r,r)
+	for panel in range(2):
+		var rect = Rect2(76,638 if panel==0 else 938,872,233)
+		if panel == 1 and not game.bonus.flags[1]:
+			box(rect,Color("073624"),gold,4)
+			text("DOUBLE",Rect2(100,995,824,55),40,gold)
+			text("A segunda tela abre com o cofre vermelho.",Rect2(100,1050,824,42),24,cream)
+			continue
+		for col in range(1,5):
+			draw_line(Vector2(rect.position.x+col*174.4,rect.position.y),Vector2(rect.position.x+col*174.4,rect.end.y),Color("aa8138"),2)
+		for row in range(3):
+			for col in range(5):
+				var r = panel*3+row
+				var symbol = (r+col+int(elapsed*13))%6 if spin_time>0 else (game.bonus.grid[r][col] if game.bonus.grid.size()>r else (r+col)%6)
+				var dest = Rect2(117+col*174.4,rect.position.y+row*77.7-8,92,92)
+				_draw_sprite(symbol,dest)
+	var total = money(game.bonus.total*game.denomination)
+	text("GANHO TOTAL: "+total,Rect2(285,1200,450,38),26,gold)
+	text("GIROS: %d   ·   MULTIPLICADOR ×%d"%[game.bonus.spins_left,game.bonus.last_multiplier],Rect2(90,1244,844,32),23,gold)
+	text(money(game.credits*game.denomination),Rect2(77,1340,237,52),30,gold)
+	text(str(game.bet),Rect2(427,1340,170,55),40,gold)
+	text("EXPLORAÇÃO: SEM ALTERAR SALDO" if preview_bonus else "BÔNUS DOS COFRES · GIROS GRATUITOS",Rect2(100,1460,824,35),23,cream)
+	if game.bonus.flags[0]:
+		box(Rect2(754,587,198,39),Color("074429"),gold,9)
+		text("MULTI ×"+str(game.bonus.last_multiplier),Rect2(754,590,198,33),23,gold)
+	if bonus_intro > 0 and game.bonus.flags.count(true) > 1:
+		box(Rect2(217,839,590,103),Color("562164"),gold,18)
+		text("SUPER BÔNUS!",Rect2(222,842,580,45),35,gold)
+		text("TELA DUPLA!" if game.bonus.flags[1] else "COFRES COMBINADOS",Rect2(222,886,580,42),29,cream)
+	if game.bonus.jackpot_name != "":
+		text(game.bonus.jackpot_name+"!",Rect2(290,592,444,40),30,gold)
+
+func _draw_sprite(index,dest):
+	var w = SYMBOL_ART.get_width()/4.0
+	var hscale = SYMBOL_ART.get_height()/1280.0
+	var source = Rect2(index%4*w,120*hscale,w,370*hscale) if index<4 else Rect2(index%4*w,510*hscale,w,300*hscale)
+	draw_texture_rect_region(SYMBOL_ART,dest,source)
+
+func _draw_modal():
+	if modal_kind != "rules":
+		._draw_modal()
+		return
+	draw_rect(Rect2(0,0,1024,1536),Color(0,0.07,0.03,0.95))
+	box(Rect2(50,100,924,1280),Color("063524"),gold,20)
+	text("SHOW MONOPOLY · REGRAS",Rect2(80,136,864,55),38,gold)
+	text("4 cartelas 3×5 · 90 números · 30 bolas iniciais\nAté dez extras com preço mostrado antes da compra.\nExtra grátis: 5% · Joker: 3%\nBola colorida: 6% · Gatilho por coleta: 5%\nColeta apenas com acerto; outro cofre combina com 10%.\nAs coletas não aumentam a chance do próximo bônus.",Rect2(80,212,864,230),24,cream)
+	text("PREMIAÇÃO DA REFERÊNCIA · múltiplos da aposta",Rect2(70,450,884,40),25,gold)
+	for i in range(game.patterns.size()):
+		var x = 85+(i%4)*219
+		var y = 517+int(i/4)*172
+		text("×"+str(game.patterns[i].pay),Rect2(x,y,194,32),26,gold)
+		for n in range(15):
+			box(Rect2(x+24+n%5*29,y+42+int(n/5)*26,25,22),Color("d43333") if n in game.patterns[i].cells else Color("142923"),ink,2)
+	text("Cada figura paga uma vez por cartela; figuras diferentes somam.\nBÔNUS na faixa identifica prêmios; não abre o slot.\nRTP não validado. Valores de acumulados fixos na demo.\nSaldo e coletas duram apenas esta sessão.",Rect2(75,1060,874,130),22,cream)
+
+func _process(delta):
+	bonus_intro = max(0.0, bonus_intro - delta)
+	if not busy and spin_time <= 0 and game.round_wins > announced_win:
+		announced_win = game.round_wins
+		audio.play_cue("win")
+	if busy and reveal_time<1.9:
+		ball_audio_age+=delta
+		if ball_audio_age>=0.075:
+			ball_audio_age=0
+			audio.play_cue("ball")
+
+func play():
+	if game._can_configure() and not busy and modal_kind == "":
+		announced_win = 0
+	.play()
+
+func open_modal(kind):
+	if kind == "bonus" and modal_kind != "bonus":
+		bonus_intro = 1.8
+	.open_modal(kind)
+
+func set_bet(delta):
+	var previous = game.bet
+	.set_bet(delta)
+	if game.bet != previous:
+		audio.play_cue("bet")

@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/voice_ultra_big_win.mp3-8c629246d25a8fb481c09195ddd56b6b.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/voice_ultra_big_win.mp3"
+dest_files=[ "res://.import/voice_ultra_big_win.mp3-8c629246d25a8fb481c09195ddd56b6b.mp3str" ]
+
+[params]
+
+loop=false
+loop_offset=0

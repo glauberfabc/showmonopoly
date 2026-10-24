@@ -1,0 +1,22 @@
+extends Node2D
+
+var game_view
+
+func _process(_delta):
+	update()
+
+func _draw():
+	if game_view == null:
+		return
+	if game_view.hit_age < 0.8:
+		for card in range(game_view.cells.size()):
+			for cell in range(15):
+				if game_view.game.cards[card][cell] == game_view.last_number:
+					var rect = Rect2(game_view.cells[card][cell][0].rect_position, Vector2(58, 52))
+					draw_rect(rect.grow(1.5), Color(1, 0.97, 0.65, (1.0 - game_view.hit_age / 0.8) * 0.75), false, 3)
+	if game_view.win_age >= 0.0 and game_view.win_age < 9.0:
+		for i in range(75):
+			var t = fmod(game_view.win_age * 0.18 + float(i) / 75.0, 1.0)
+			var x = fmod(float(i) * 113.7 + sin(game_view.win_age + i) * 35, 1024)
+			var y = t * 1470
+			draw_circle(Vector2(x, y), 2.0 + i % 4, Color(1, 0.8, 0.22, sin(t * PI) * 0.8))

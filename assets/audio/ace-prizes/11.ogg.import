@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/11.ogg-437af29248f0a8bd3b706c95ebcf73e3.oggstr"
+
+[deps]
+
+source_file="res://assets/audio/ace-prizes/11.ogg"
+dest_files=[ "res://.import/11.ogg-437af29248f0a8bd3b706c95ebcf73e3.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=0

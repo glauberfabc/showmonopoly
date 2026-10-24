@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/game-sounds-en-hash_12a703cb7803d40f9b24_e2d511ae.mp3-cb0ea91f8932c71fff986e2c91adef05.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/game-sounds-en-hash_12a703cb7803d40f9b24_e2d511ae.mp3"
+dest_files=[ "res://.import/game-sounds-en-hash_12a703cb7803d40f9b24_e2d511ae.mp3-cb0ea91f8932c71fff986e2c91adef05.mp3str" ]
+
+[params]
+
+loop=true
+loop_offset=0

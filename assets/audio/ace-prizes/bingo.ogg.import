@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/bingo.ogg-1929a6f92e04f06ecd3fe0da2c3f17e1.oggstr"
+
+[deps]
+
+source_file="res://assets/audio/ace-prizes/bingo.ogg"
+dest_files=[ "res://.import/bingo.ogg-1929a6f92e04f06ecd3fe0da2c3f17e1.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=0

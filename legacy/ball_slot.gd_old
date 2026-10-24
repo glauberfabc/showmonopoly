@@ -1,0 +1,32 @@
+extends Control
+
+var radius = 25.0
+var number = 0
+var latest = false
+var number_font
+var age = 0.0
+
+func set_number(value, is_latest):
+	if value != number:
+		age = 0.0
+	number = value
+	latest = is_latest
+	update()
+
+func _process(delta):
+	age += delta
+	if latest:
+		update()
+
+func _draw():
+	var center = rect_size * 0.5
+	if number == 0:
+		draw_circle(center, radius - 1, Color(0.015, 0.004, 0.028, 0.52))
+		return
+	if latest:
+		var alpha = 0.7 + 0.25 * sin(age * 5)
+		draw_arc(center, radius + 1, 0, TAU, 48, Color(1, 0.95, 0.65, alpha), 2.2, true)
+	if number_font != null:
+		var text = "%02d" % number
+		var size = number_font.get_string_size(text)
+		draw_string(number_font, center + Vector2(-size.x / 2, (number_font.get_ascent() - number_font.get_descent()) / 2), text, Color("211304"))

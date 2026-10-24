@@ -1,0 +1,109 @@
+extends Node2D
+# Animated brass and amethyst draw machine. Godot 3.6, no external assets.
+var spinning = false
+var elapsed = 0.0
+var spin_speed = 0.22
+var last_ball = 0
+var reveal_age = 99.0
+var balls = []
+var number_font = null
+
+func _ready():
+	var label = Label.new()
+	number_font = label.get_font("font")
+	label.free()
+	for i in range(20):
+		balls.append({"angle": float(i) * 2.39996, "radius": 25.0 + float(i % 6) * 13.0, "number": i + 1, "size": 9.0 + float(i % 3)})
+	set_process(true)
+
+func set_spinning(value):
+	spinning = value
+
+func reveal_ball(number):
+	last_ball = int(number)
+	reveal_age = 0.0
+
+func _process(delta):
+	elapsed += delta
+	reveal_age += delta
+	spin_speed = lerp(spin_speed, 2.8 if spinning else 0.22, min(delta * 2.5, 1.0))
+	for i in range(balls.size()):
+		balls[i]["angle"] += delta * spin_speed * (0.8 + float(i % 4) * 0.12)
+	update()
+
+func _ellipse(center, radius_x, radius_y, color, filled = true, width = 2.0):
+	var points = PoolVector2Array()
+	for i in range(65):
+		var angle = TAU * float(i) / 64.0
+		points.append(center + Vector2(cos(angle) * radius_x, sin(angle) * radius_y))
+	if filled:
+		draw_colored_polygon(points, color)
+	else:
+		draw_polyline(points, color, width, true)
+
+func _number(center, number, scale_factor, color):
+	if number_font == null:
+		return
+	var text = str(number)
+	var size = number_font.get_string_size(text)
+	draw_set_transform(center, 0.0, Vector2(scale_factor, scale_factor))
+	draw_string(number_font, Vector2(-size.x * 0.5, number_font.get_ascent() * 0.36), text, color)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+func _draw():
+	var gold = Color("eec779")
+	var dark_gold = Color("7a4a27")
+	# Atmospheric halo.
+	for i in range(8, 0, -1):
+		draw_circle(Vector2.ZERO, 123.0 + float(i) * 4.0, Color(0.60, 0.20, 0.96, 0.018))
+	# Pedestal and flared foot.
+	draw_colored_polygon(PoolVector2Array([Vector2(-63, 97), Vector2(63, 97), Vector2(50, 163), Vector2(90, 192), Vector2(83, 216), Vector2(-83, 216), Vector2(-90, 192), Vector2(-50, 163)]), dark_gold)
+	draw_colored_polygon(PoolVector2Array([Vector2(-50, 103), Vector2(50, 103), Vector2(38, 164), Vector2(72, 191), Vector2(-72, 191), Vector2(-38, 164)]), Color("442158"))
+	_ellipse(Vector2(0, 198), 88, 18, gold)
+	_ellipse(Vector2(0, 192), 79, 14, Color("8b5a37"))
+	_ellipse(Vector2(0, 188), 69, 11, Color("dca85a"))
+	# Glass sphere layers.
+	draw_circle(Vector2.ZERO, 126, dark_gold)
+	draw_circle(Vector2.ZERO, 122, gold)
+	draw_circle(Vector2.ZERO, 117, Color("25133f"))
+	draw_circle(Vector2(0, 4), 110, Color("3c1d5b"))
+	_ellipse(Vector2(0, 69), 83, 24, Color(0.72, 0.21, 0.93, 0.19))
+	# Balls orbit at different rates in the glass chamber.
+	for ball in balls:
+		var a = ball["angle"]
+		var r = ball["radius"]
+		var p = Vector2(cos(a) * r, sin(a) * r * 0.87)
+		p.y += sin(elapsed * 2.0 + a) * (3.0 if spinning else 1.0)
+		var radius = ball["size"]
+		draw_circle(p + Vector2(2, 3), radius, Color(0.04, 0.02, 0.08, 0.6))
+		var tint = Color("fff0bc") if int(ball["number"]) % 3 != 0 else Color("e8c0ef")
+		draw_circle(p, radius, tint)
+		draw_circle(p + Vector2(-3, -3), radius * 0.29, Color(1, 1, 1, 0.55))
+		_number(p, ball["number"], 0.7, Color("492447"))
+	# Curved reflections keep the glass transparent.
+	draw_arc(Vector2.ZERO, 105, 3.52, 4.37, 25, Color(1, 0.9, 1, 0.40), 5, true)
+	draw_arc(Vector2.ZERO, 100, 3.65, 4.18, 20, Color(1, 1, 1, 0.22), 11, true)
+	draw_arc(Vector2.ZERO, 113, -0.2, 0.8, 25, Color(0.84, 0.52, 1, 0.55), 3, true)
+	_ellipse(Vector2(0, 1), 123, 112, Color(1, 0.82, 0.48, 0.25), false, 2)
+	# Crown cap and jewel.
+	_ellipse(Vector2(0, -119), 46, 11, dark_gold)
+	_ellipse(Vector2(0, -124), 39, 9, gold)
+	draw_colored_polygon(PoolVector2Array([Vector2(-23, -127), Vector2(-15, -146), Vector2(0, -135), Vector2(15, -146), Vector2(23, -127)]), gold)
+	draw_circle(Vector2(0, -139), 7, Color("be7fff"))
+	# Floating sparks.
+	for i in range(12):
+		var phase = fmod(elapsed * (0.32 if spinning else 0.13) + float(i) / 12.0, 1.0)
+		var p = Vector2(sin(float(i) * 6.2 + elapsed * 0.8) * (105.0 + float(i % 3) * 8.0), 105.0 - phase * 237.0)
+		var alpha = sin(phase * PI) * (0.85 if spinning else 0.3)
+		draw_circle(p, 1.5 + float(i % 2), Color(1, 0.78, 0.36, alpha))
+	# Draw outlet window and the last extracted ball.
+	draw_circle(Vector2(0, 142), 36, dark_gold)
+	draw_circle(Vector2(0, 142), 31, gold)
+	draw_circle(Vector2(0, 142), 27, Color("25132f"))
+	if last_ball > 0:
+		var pop = 1.0 + 0.18 * exp(-reveal_age * 4.0) * sin(reveal_age * 16.0)
+		draw_circle(Vector2(0, 141), 23.0 * pop, Color("fff0bc"))
+		draw_circle(Vector2(-7, 133), 5, Color(1, 1, 1, 0.60))
+		_number(Vector2(0, 141), last_ball, 1.4, Color("492447"))
+	else:
+		_number(Vector2(0, 141), "?", 1.4, gold)

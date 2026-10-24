@@ -1,0 +1,56 @@
+{
+  "rounds": 2000,
+  "seed": 20261007,
+  "strategy": "buy all affordable extras; Joker chooses smallest available number",
+  "stake": 27451,
+  "base_patterns": 6825,
+  "bingo_jackpot": 0,
+  "bonus": 656,
+  "bonus_sessions": 130,
+  "free_extras": 1000,
+  "jokers": 619,
+  "initial_pattern_wins": 960,
+  "initial_bonus_wins": 379,
+  "scale_comparison": [
+    {
+      "scale": 1,
+      "stake": 27451,
+      "base_contribution": 0.248625,
+      "bonus_scale_for_33pct": 13.809192
+    },
+    {
+      "scale": 2,
+      "stake": 41266,
+      "base_contribution": 0.330781,
+      "bonus_scale_for_33pct": 20.758811
+    },
+    {
+      "scale": 3,
+      "stake": 55229,
+      "base_contribution": 0.370729,
+      "bonus_scale_for_33pct": 27.782881
+    },
+    {
+      "scale": 4,
+      "stake": 66311,
+      "base_contribution": 0.411696,
+      "bonus_scale_for_33pct": 33.357668
+    },
+    {
+      "scale": 5,
+      "stake": 76732,
+      "base_contribution": 0.44473,
+      "bonus_scale_for_33pct": 38.599939
+    },
+    {
+      "scale": 10,
+      "stake": 140177,
+      "base_contribution": 0.486884,
+      "bonus_scale_for_33pct": 70.515869
+    }
+  ],
+  "observed_return": 0.272522,
+  "notice": "Diagnostic sample only. Not a calibrated or certified RTP; rare jackpots and other Joker/extra strategies are not estimated reliably.",
+  "obsolete_for_current_build": true,
+  "version": "Pre-reference provisional Board & Bonus table"
+}

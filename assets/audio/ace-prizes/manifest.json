@@ -1,0 +1,98 @@
+[
+  {
+    "group": "Ace Base · bingo",
+    "name": "bingo",
+    "file": "sound-eb983ff9864929ea.ogg",
+    "start": 0,
+    "end": 23.45795918367347,
+    "duration": 23.45795918367347
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "1",
+    "file": "sound-c44f929b67d3f0cb.ogg",
+    "start": 0,
+    "end": 11.937959183673469,
+    "duration": 11.937959183673469
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "2",
+    "file": "sound-063b712bf54e3b56.ogg",
+    "start": 0,
+    "end": 10.919183673469387,
+    "duration": 10.919183673469387
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "3",
+    "file": "sound-beccc9b5e14cd35a.ogg",
+    "start": 0,
+    "end": 7.706122448979592,
+    "duration": 7.706122448979592
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "5",
+    "file": "sound-18c4aca1a0e6e281.ogg",
+    "start": 0,
+    "end": 6.922448979591837,
+    "duration": 6.922448979591837
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "4",
+    "file": "sound-41176484d8348a82.ogg",
+    "start": 0,
+    "end": 4.493061224489796,
+    "duration": 4.493061224489796
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "6",
+    "file": "sound-9560a379958a2c3d.ogg",
+    "start": 0,
+    "end": 3.709387755102041,
+    "duration": 3.709387755102041
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "11",
+    "file": "sound-fc089337077c41dc.ogg",
+    "start": 0,
+    "end": 1.253877551020408,
+    "duration": 1.253877551020408
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "10",
+    "file": "sound-4750311d3d3e8003.ogg",
+    "start": 0,
+    "end": 1.593469387755102,
+    "duration": 1.593469387755102
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "7",
+    "file": "sound-3e9bf356249286b5.ogg",
+    "start": 0,
+    "end": 3.3959183673469386,
+    "duration": 3.3959183673469386
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "9",
+    "file": "sound-5c2ca534f4ba6e59.ogg",
+    "start": 0,
+    "end": 2.56,
+    "duration": 2.56
+  },
+  {
+    "group": "Ace Base · bingo",
+    "name": "8",
+    "file": "sound-9dd84c5888478cd0.ogg",
+    "start": 0,
+    "end": 1.0448979591836736,
+    "duration": 1.0448979591836736
+  }
+]

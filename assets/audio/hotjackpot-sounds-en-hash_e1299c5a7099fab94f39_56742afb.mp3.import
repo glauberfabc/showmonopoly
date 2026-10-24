@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/hotjackpot-sounds-en-hash_e1299c5a7099fab94f39_56742afb.mp3-50eb6312ab6233a7991e8f8ebe219739.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/hotjackpot-sounds-en-hash_e1299c5a7099fab94f39_56742afb.mp3"
+dest_files=[ "res://.import/hotjackpot-sounds-en-hash_e1299c5a7099fab94f39_56742afb.mp3-50eb6312ab6233a7991e8f8ebe219739.mp3str" ]
+
+[params]
+
+loop=true
+loop_offset=0

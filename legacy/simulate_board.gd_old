@@ -1,0 +1,58 @@
+extends SceneTree
+const Rules = preload("res://scripts/board_rules.gd")
+func _init():
+	var result = {"rounds": 2000, "seed": 20261007, "strategy": "buy all affordable extras; Joker chooses smallest available number", "stake": 0, "base_patterns": 0, "bingo_jackpot": 0, "bonus": 0, "bonus_sessions": 0, "free_extras": 0, "jokers": 0}
+	var scales = [1, 2, 3, 4, 5, 10]
+	var stakes = [0, 0, 0, 0, 0, 0]
+	result["initial_pattern_wins"] = 0
+	result["initial_bonus_wins"] = 0
+	var g = Rules.new()
+	g.rng.seed = result.seed
+	g.bonus.rng.seed = result.seed + 1
+	g.credits = 100000000
+	for _round in range(result.rounds):
+		g.change_cards()
+		g.start_round()
+		result.stake += g.bet
+		for i in range(scales.size()): stakes[i] += g.bet
+		g.draw_initial()
+		var initial_jackpot = int(g.jackpot / g.denomination) if g.jackpot_won else 0
+		result.bingo_jackpot += initial_jackpot
+		result.initial_pattern_wins += g.round_wins - initial_jackpot
+		var round_bonus = 0
+		while g.phase != "finished":
+			match g.phase:
+				"bonus":
+					if g.bonus.spins_left > 0:
+						var spin_win = g.spin_bonus()
+						round_bonus += spin_win
+						if g.extras_bought == 0: result.initial_bonus_wins += spin_win
+					else:
+						result.bonus_sessions += 1
+						g.close_bonus()
+				"joker":
+					result.jokers += 1
+					g.choose_joker(g.joker_options()[0])
+				"extras":
+					if g.credits < g.extra_quote():
+						g.finish_round()
+					else:
+						var expected = g.extra_expected()
+						g.buy_extra()
+						if not g.last_extra_free:
+							for i in range(scales.size()): stakes[i] += int(max(g.bet, ceil(expected * scales[i])))
+						result.stake += g.last_extra_cost
+						if g.last_extra_free: result.free_extras += 1
+		result.bonus += round_bonus
+		result.base_patterns += g.round_wins - initial_jackpot - round_bonus
+	result["scale_comparison"] = []
+	for i in range(scales.size()):
+		result.scale_comparison.append({"scale": scales[i], "stake": stakes[i], "base_contribution": float(result.base_patterns * scales[i]) / stakes[i], "bonus_scale_for_33pct": 0.33 * stakes[i] / max(1, result.bonus)})
+	result["observed_return"] = float(result.base_patterns + result.bingo_jackpot + result.bonus) / result.stake
+	result["notice"] = "Diagnostic sample only. Not a calibrated or certified RTP; rare jackpots and other Joker/extra strategies are not estimated reliably."
+	var file = File.new()
+	file.open("res://tests/math-sample.json", File.WRITE)
+	file.store_string(JSON.print(result, "  "))
+	file.close()
+	print(JSON.print(result))
+	quit()

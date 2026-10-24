@@ -1,0 +1,32 @@
+[
+  {
+    "source_host": "assetscdn-wchat.au.freshchat.com",
+    "source_name": "notif.da662fefc5060dabf2859ea199198b14.mp3",
+    "mime": "audio/mpeg",
+    "status": "extracted",
+    "file": "notif_da662fefc5060dabf2859ea199198b14_eb2e3f70.mp3",
+    "bytes": 4302,
+    "sha256": "eb2e3f703cf8ee0156a1d625e053c0968b0dfcff62ea4254ddd8ba9fece3ad32",
+    "duration_seconds": 1.019
+  },
+  {
+    "source_host": "qtech-ap.multidragon.online.s4gaming.com",
+    "source_name": "game-sounds-en-hash=12a703cb7803d40f9b24.mp3",
+    "mime": "audio/mpeg",
+    "status": "extracted",
+    "file": "game-sounds-en-hash_12a703cb7803d40f9b24_e2d511ae.mp3",
+    "bytes": 4205340,
+    "sha256": "e2d511ae32fc0c6a998a8e6544e74f37617f3ea8407b3e4283fe10ccb7c2feb6",
+    "duration_seconds": 262.818
+  },
+  {
+    "source_host": "qtech-ap.multidragon.online.s4gaming.com",
+    "source_name": "hotjackpot-sounds-en-hash=e1299c5a7099fab94f39.mp3",
+    "mime": "audio/mpeg",
+    "status": "extracted",
+    "file": "hotjackpot-sounds-en-hash_e1299c5a7099fab94f39_56742afb.mp3",
+    "bytes": 500550,
+    "sha256": "56742afbeac5319bee30d564f5ff7b25076eb5095b257c0b9db4d420a731bf71",
+    "duration_seconds": 31.269
+  }
+]

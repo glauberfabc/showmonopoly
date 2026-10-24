@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/notif_da662fefc5060dabf2859ea199198b14_eb2e3f70.mp3-886b0cd7d6215e1e1825874f043f84c1.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/notif_da662fefc5060dabf2859ea199198b14_eb2e3f70.mp3"
+dest_files=[ "res://.import/notif_da662fefc5060dabf2859ea199198b14_eb2e3f70.mp3-886b0cd7d6215e1e1825874f043f84c1.mp3str" ]
+
+[params]
+
+loop=true
+loop_offset=0

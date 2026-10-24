@@ -1,0 +1,20 @@
+{
+  "version": "Show Monopoly reference artwork and paytable",
+  "url": "http://2.25.190.121/games/potion-master/",
+  "engine": "Godot 3.6",
+  "native_rules": "passed; deterministic boundaries and 100 random complete rounds",
+  "public_assets": "8 HTTP 200, matching SHA-256",
+  "browser_console_errors": [],
+  "public_bonus_smoke": {
+    "flags": [
+      "Multiplier",
+      "Double",
+      "Extra Spins"
+    ],
+    "grid": "5x6 as two stacked 5x3 boards",
+    "spins_after_one": 4,
+    "demo_credits_before": 1000,
+    "demo_credits_after": 1000
+  },
+  "rtp_calibrated": false
+}

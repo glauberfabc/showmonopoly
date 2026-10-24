@@ -1,0 +1,154 @@
+extends Reference
+# Godot 3.6. All balances/bets use credits; denomination/jackpot use cents.
+# start_round and the setters report success. Draw/buy return -1 on failure.
+# deck is public so deterministic tests can supply a controlled draw sequence.
+
+const MAX_BET = 20
+const INITIAL_BALLS = 30
+const MAX_EXTRAS = 10
+const BALL_COUNT = 75
+const CARD_SIZE = 15
+const CARD_COUNT = 4
+
+var credits = 1000
+var bet = 1
+var denomination = 10
+var jackpot = 500000
+var cards = []
+var card_enabled = [true, true, true, true]
+var drawn = []
+var deck = []
+var extras_bought = 0
+var phase = "ready"
+var jackpot_won = false
+var _rng = RandomNumberGenerator.new()
+
+func _init():
+	_rng.randomize()
+	_generate_cards()
+
+func _shuffled_numbers():
+	var numbers = []
+	for number in range(1, BALL_COUNT + 1):
+		numbers.append(number)
+	for index in range(numbers.size() - 1, 0, -1):
+		var other = _rng.randi_range(0, index)
+		var temporary = numbers[index]
+		numbers[index] = numbers[other]
+		numbers[other] = temporary
+	return numbers
+
+func _generate_cards():
+	cards.clear()
+	for _card_index in range(CARD_COUNT):
+		var numbers = _shuffled_numbers()
+		var card = []
+		for index in range(CARD_SIZE):
+			card.append(numbers[index])
+		card.sort()
+		var display_card = []
+		for row in range(3):
+			for column in range(5):
+				display_card.append(card[column * 3 + row])
+		cards.append(display_card)
+
+func _can_configure():
+	return phase == "ready" or phase == "finished"
+
+func set_bet(value):
+	if not _can_configure() or typeof(value) != TYPE_INT or value < 1 or value > MAX_BET:
+		return false
+	bet = value
+	return true
+
+func set_denomination(value):
+	if not _can_configure() or typeof(value) != TYPE_INT or not value in [10, 25]:
+		return false
+	denomination = value
+	return true
+
+# The single initial stake buys all four cards and thirty initial draws.
+func start_round():
+	if not _can_configure() or credits < bet or not true in card_enabled:
+		return false
+	if phase == "finished":
+		_generate_cards()
+	credits -= bet
+	drawn.clear()
+	extras_bought = 0
+	jackpot_won = false
+	deck = _shuffled_numbers()
+	phase = "drawing"
+	return true
+
+# Keep the visible, selected cards when the next paid round starts.
+func change_cards():
+	if not _can_configure():
+		return false
+	_generate_cards()
+	drawn.clear()
+	deck.clear()
+	extras_bought = 0
+	jackpot_won = false
+	phase = "ready"
+	return true
+
+func matches(card):
+	var count = 0
+	for number in card:
+		if number in drawn:
+			count += 1
+	return count
+
+# Resolve the accumulated prize once, after the thirty initial balls.
+func draw_next():
+	if phase != "drawing" or drawn.size() >= INITIAL_BALLS or deck.empty():
+		return -1
+	var number = deck.pop_front()
+	drawn.append(number)
+	if drawn.size() == INITIAL_BALLS:
+		phase = "extras"
+		for index in range(cards.size()):
+			if card_enabled[index] and matches(cards[index]) == CARD_SIZE:
+				jackpot_won = true
+				credits += int(jackpot / denomination)
+				phase = "finished"
+				break
+	return number
+
+# Extras cost the current bet apiece. They cannot win the accumulated prize.
+func buy_extra():
+	if phase != "extras" or extras_bought >= MAX_EXTRAS or credits < bet or deck.empty():
+		return -1
+	credits -= bet
+	extras_bought += 1
+	var number = deck.pop_front()
+	drawn.append(number)
+	if extras_bought == MAX_EXTRAS:
+		phase = "finished"
+	return number
+
+func finish_round():
+	if phase != "extras":
+		return false
+	phase = "finished"
+	return true
+
+func reset_demo():
+	if not _can_configure():
+		return false
+	credits = 1000
+	card_enabled = [true, true, true, true]
+	drawn.clear()
+	deck.clear()
+	extras_bought = 0
+	jackpot_won = false
+	phase = "ready"
+	_generate_cards()
+	return true
+
+func toggle_card(index):
+	if not _can_configure() or index < 0 or index >= CARD_COUNT:
+		return false
+	card_enabled[index] = not card_enabled[index]
+	return true

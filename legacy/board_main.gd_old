@@ -1,0 +1,446 @@
+extends Control
+
+const Rules = preload("res://scripts/board_rules.gd")
+var game = Rules.new()
+var fonts = {}
+var draw_legacy_board = true
+var controls = {}
+var modal
+var modal_buttons = []
+var audio
+var callback
+var elapsed = 0.0
+var reveal_time = 0.0
+var busy = false
+var spin_time = 0.0
+var sound_enabled = true
+var status_message = "Quatro cartelas. 90 números. Uma nova rodada."
+var gold = Color("e6b85f")
+var ink = Color("132b34")
+var cream = Color("f6efda")
+var colors = [Color("45b886"), Color("df6860"), Color("57a8db"), Color("b493d9")]
+var slot_colors = [Color("50bd94"), Color("e37b63"), Color("82add2"), Color("c7a1dc"), Color("dfbc69"), Color("eed9a4")]
+var modal_kind = ""
+var preview_bonus = false
+
+func font(size):
+	if not fonts.has(size):
+		var f = DynamicFont.new()
+		f.font_data = load("res://assets/ui.ttf")
+		f.size = size
+		fonts[size] = f
+	return fonts[size]
+
+func box(rect, color, border = Color("36525a"), radius = 16):
+	var s = StyleBoxFlat.new()
+	s.bg_color = color
+	s.border_color = border
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(radius)
+	draw_style_box(s, rect)
+
+func text(value, rect, size = 24, color = Color("f6efda")):
+	var f = font(size)
+	var lines = str(value).split("\n")
+	for i in range(lines.size()):
+		var pos = Vector2(rect.position.x + (rect.size.x - f.get_string_size(lines[i]).x) / 2, rect.position.y + size + i * (size + 6))
+		draw_string(f, pos, lines[i], color)
+
+func button(key, caption, rect, method, args = []):
+	var b = Button.new()
+	b.text = caption
+	b.rect_position = rect.position
+	b.rect_size = rect.size
+	b.add_font_override("font", font(23))
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var s = StyleBoxFlat.new()
+		s.bg_color = Color("214851") if state != "disabled" else Color("23343c")
+		s.border_color = gold if state != "disabled" else Color("486068")
+		s.set_border_width_all(2)
+		s.set_corner_radius_all(12)
+		b.add_stylebox_override(state, s)
+	b.connect("pressed", self, method, args)
+	add_child(b)
+	controls[key] = b
+	return b
+
+func money(cents):
+	return ("R$ %.2f" % (float(cents) / 100.0)).replace(".", ",")
+
+func _ready():
+	audio = preload("res://scripts/game_audio.gd").new()
+	add_child(audio)
+	load_settings()
+	audio.set_enabled(sound_enabled)
+	button("cards", "TROCAR CARTELAS", Rect2(35, 28, 250, 48), "change_cards")
+	button("sound", "SOM", Rect2(747, 28, 105, 48), "toggle_sound")
+	button("menu", "REGRAS", Rect2(864, 28, 125, 48), "show_rules")
+	button("minus", "−", Rect2(354, 1372, 58, 63), "set_bet", [-1])
+	button("plus", "+", Rect2(570, 1372, 58, 63), "set_bet", [1])
+	button("play", "JOGAR", Rect2(660, 1360, 329, 85), "play")
+	button("extra", "COMPRAR EXTRA", Rect2(681, 1228, 300, 66), "buy_extra")
+	button("coin", "R$ 0,10", Rect2(35, 1456, 220, 47), "toggle_coin")
+	button("reset", "RECARREGAR DEMO", Rect2(275, 1456, 290, 47), "reset_demo")
+	button("preview", "EXPLORAR BÔNUS", Rect2(585, 1456, 404, 47), "preview")
+	if OS.has_feature("JavaScript"):
+		callback = JavaScript.create_callback(self, "_browser_command")
+		JavaScript.get_interface("window").potionCommand = callback
+	refresh()
+
+func _draw():
+	if not draw_legacy_board:
+		return
+	draw_rect(Rect2(0, 0, 1024, 1536), ink)
+	for i in range(18):
+		draw_line(Vector2(i * 80 - 500, 0), Vector2(i * 80 + 900, 1536), Color(0.6, 0.8, 0.7, 0.035), 2)
+	text("POTION MASTER", Rect2(270, 25, 480, 52), 39, gold)
+	text("B O A R D   &   B O N U S", Rect2(100, 95, 824, 40), 18)
+	for i in range(3):
+		var x = 35 + i * 323
+		box(Rect2(x, 147, 307, 67), Color("0d2028"), gold)
+		text(["MINI", "MINOR", "MAJOR"][i], Rect2(x, 153, 307, 25), 16, colors[i])
+		text(money([25, 100, 500][i] * game.bet * game.denomination), Rect2(x, 177, 307, 33), 25, gold)
+		var pulse = 1.0 + 0.025 * sin(elapsed * 6.0) if busy and _has_collected(i) else 1.0
+		var rect = Rect2(x + 22, 237, 263, 171)
+		box(rect.grow((pulse - 1.0) * 100), colors[i].darkened(0.42), colors[i], 22)
+		box(Rect2(x + 45, 254, 217, 117), colors[i].darkened(0.63), colors[i], 15)
+		draw_circle(Vector2(x + 153, 309), 28, gold)
+		draw_arc(Vector2(x + 153, 309), 18, 0, TAU, 32, ink, 4)
+		for a in range(4):
+			var dir = Vector2(cos(a * PI / 2), sin(a * PI / 2))
+			draw_line(Vector2(x + 153, 309), Vector2(x + 153, 309) + dir * 22, ink, 4)
+		text(["MULTIPLIER", "DOUBLE", "EXTRA SPINS"][i], Rect2(x, 377, 307, 32), 23)
+		text("%d coletas nesta sessão" % game.collections[i], Rect2(x, 419, 307, 28), 17, colors[i])
+	text("Cada coleta tem chance independente. O tamanho do cofre não prevê o bônus.", Rect2(25, 462, 974, 28), 18, Color("a8c1c2"))
+	text(status_message, Rect2(25, 487, 974, 23), 16, gold)
+	box(Rect2(215, 511, 594, 64), Color("0c222a"), gold)
+	text("BINGO ATÉ A 30ª BOLA  ·  " + money(game.jackpot), Rect2(215, 526, 594, 35), 25, gold)
+	# Original board-game mascots and dice, drawn natively.
+	for x in [99, 925]:
+		draw_circle(Vector2(x, 547), 28, Color("e5b48c"))
+		draw_rect(Rect2(x - 26, 506, 52, 20), gold)
+		draw_rect(Rect2(x - 35, 525, 70, 8), gold)
+		draw_circle(Vector2(x - 9, 545), 3, ink)
+		draw_circle(Vector2(x + 9, 545), 3, ink)
+		draw_arc(Vector2(x, 550), 12, 0, PI, 16, ink, 2)
+	for c in range(4):
+		var x = 35 if c % 2 == 0 else 665
+		var y = 612 if c < 2 else 852
+		box(Rect2(x, y, 324, 217), cream, colors[c], 12)
+		box(Rect2(x, y, 324, 42), colors[c].darkened(0.3), colors[c], 10)
+		text("GO  ·  CARTELA %d  ·  ?" % (c + 1), Rect2(x, y + 4, 324, 32), 19)
+		for n in range(15):
+			var cell = Rect2(x + 9 + (n % 5) * 62, y + 50 + int(n / 5) * 51, 58, 46)
+			var hit = game.cards[c][n] in game.drawn
+			box(cell, colors[c] if hit else Color("e8dfc6"), Color("d2c7ac"), 5)
+			text("%02d" % game.cards[c][n], Rect2(cell.position.x, cell.position.y + 4, 58, 36), 27, ink)
+	var center = Vector2(512, 779)
+	draw_circle(center, 143, gold.darkened(0.25))
+	draw_circle(center, 133, Color("0c232e"))
+	draw_arc(center, 119, 0, TAU, 80, gold, 3)
+	for i in range(17):
+		var angle = i * 2.399 + elapsed * (3 if busy else 0.35)
+		var pos = center + Vector2(cos(angle), sin(angle * 1.1)) * (30 + i * 4.3)
+		draw_circle(pos, 17, cream)
+		text(str((i * 7) % 90 + 1), Rect2(pos.x - 17, pos.y - 11, 34, 30), 14, ink)
+	box(Rect2(413, 922, 198, 77), Color("b8843c"), gold, 12)
+	text("90 NÚMEROS", Rect2(410, 939, 204, 36), 23, ink)
+	text("GLOBO DOURADO", Rect2(360, 1031, 304, 32), 19, gold)
+	if busy:
+		for event in game.ball_events:
+			if event.collected:
+				var t = fmod(reveal_time * 0.9 + event.number * 0.019, 1.0)
+				var dest = Vector2(188 + event.color * 323, 310)
+				var pos = center.linear_interpolate(dest, t) + Vector2(sin(t * PI) * 55, 0)
+				draw_circle(pos, 21, colors[event.color])
+				text(str(event.number), Rect2(pos.x - 22, pos.y - 14, 44, 34), 17, ink)
+	box(Rect2(35, 1096, 616, 218), Color("0d222a"), Color("40606a"))
+	box(Rect2(665, 1096, 324, 218), Color("0d222a"), Color("40606a"))
+	text("30 BOLAS SORTEADAS", Rect2(35, 1106, 616, 32), 21, gold)
+	text("10 BOLAS EXTRAS", Rect2(665, 1106, 324, 32), 21, gold)
+	for i in range(40):
+		var pos = Vector2(68 + (i % 10) * 60.5, 1172 + int(i / 10) * 51) if i < 30 else Vector2(697 + ((i - 30) % 5) * 65, 1163 + int((i - 30) / 5) * 42)
+		var col = Color("263f47")
+		if i < game.ball_events.size():
+			col = cream if game.ball_events[i].color < 0 else colors[game.ball_events[i].color]
+		draw_circle(pos, 21 if i < 30 else 17, col)
+		if i < game.drawn.size():
+			text("%02d" % game.drawn[i], Rect2(pos.x - 23, pos.y - 14, 46, 30), 20, ink)
+	text("CRÉDITOS DEMO", Rect2(35, 1330, 275, 30), 18, Color("a8c1c2"))
+	text(str(game.credits), Rect2(35, 1372, 275, 60), 42, gold)
+	text("APOSTA", Rect2(418, 1330, 147, 30), 18, Color("a8c1c2"))
+	text(str(game.bet), Rect2(418, 1372, 147, 60), 42)
+	text("GANHOS DA RODADA: %d CRÉDITOS" % game.round_wins, Rect2(50, 1510, 924, 24), 14, Color("a8c1c2"))
+	if modal_kind != "":
+		_draw_modal()
+
+func _draw_modal():
+	draw_rect(Rect2(0, 0, 1024, 1536), Color(0.02, 0.06, 0.08, 0.95))
+	box(Rect2(50, 140, 924, 1200), Color("122f39"), gold, 28)
+	if modal_kind == "rules":
+		text("COMO JOGAR", Rect2(80, 175, 864, 60), 42, gold)
+		text("4 cartelas ativas · 30 bolas de 90 · até 10 extras\nBingo até a 30ª bola paga " + money(game.jackpot) + ".\nFiguras diferentes acumulam; cada figura paga uma vez.\nExtras: preço mostrado antes da compra.\n5% de chance de extra grátis; 3% de Joker.\nBolas coloridas: 6%; coleta só com acerto.\nCada coleta: 5% de chance de ativar seu cofre.\nOutro cofre combina com 10% de chance independente.\nContadores registram coletas, não aumentam a chance.", Rect2(85, 266, 854, 370), 24)
+		text("TABELA PROVISÓRIA · múltiplos da aposta", Rect2(80, 670, 864, 44), 25, gold)
+		var display = [game.patterns[0], game.patterns[3], game.patterns[6], game.patterns[7], game.patterns[8], game.patterns[9]]
+		for i in range(6):
+			var x = 98 + (i % 3) * 285
+			var y = 735 + int(i / 3) * 170
+			text(display[i].name + " · " + str(display[i].pay) + "×", Rect2(x, y, 255, 32), 22)
+			for n in range(15):
+				box(Rect2(x + 45 + n % 5 * 32, y + 43 + int(n / 5) * 27, 28, 23), gold if n in display[i].cells else Color("28434b"), ink, 3)
+		text("Demonstração sem dinheiro real. RTP ainda não validado.\nMini/Minor/Major são valores fixos por aposta nesta versão.", Rect2(80, 1090, 864, 90), 22, Color("b6cbce"))
+	elif modal_kind == "joker":
+		text("BOLA ZAZ · JOKER", Rect2(80, 195, 864, 60), 42, gold)
+		text("Escolha um número ainda não marcado.\nEle será removido do globo e contará como esta extra.\nO mesmo número marca todas as cartelas.", Rect2(90, 285, 844, 140), 25)
+	else:
+		text("SUPER BÔNUS" if game.bonus.flags.count(true) > 1 else "BÔNUS DOS COFRES", Rect2(80, 185, 864, 60), 40, gold)
+		var labels = []
+		for i in range(3):
+			if game.bonus.flags[i]:
+				labels.append(["MULTIPLIER", "DOUBLE · 5×6", "EXTRA SPINS"][i])
+		text(PoolStringArray(labels).join("   +   "), Rect2(60, 272, 904, 38), 23)
+		text("EXPLORAÇÃO · sem débito, prêmio ou efeito na rodada" if preview_bonus else "GIROS GRATUITOS · créditos demonstrativos", Rect2(70, 320, 884, 35), 19, Color("b6cbce"))
+		for row in range(game.bonus.rows):
+			for col in range(5):
+				var id = (row + col + int(elapsed * 15)) % 6 if spin_time > 0 else (game.bonus.grid[row][col] if game.bonus.grid.size() > row else (row + col) % 6)
+				var rect = Rect2(108 + col * 164, 399 + row * 96, 152, 84)
+				box(rect, slot_colors[id].darkened(0.64), slot_colors[id], 12)
+				draw_symbol(id, rect.position + Vector2(76, 27), slot_colors[id])
+				text(game.bonus.SYMBOLS[id], Rect2(rect.position.x, rect.position.y + 55, 152, 24), 16, slot_colors[id])
+		text("GIROS: %d    MULTIPLICADOR: %d×" % [game.bonus.spins_left, game.bonus.last_multiplier], Rect2(80, 1000, 864, 42), 26, gold)
+		text("ÚLTIMO GANHO: %d    TOTAL: %d" % [game.bonus.last_win, game.bonus.total], Rect2(80, 1057, 864, 42), 26)
+		text("3 / 4 / 5 iguais da esquerda: 2× / 5× / 15× por linha.\nVerde: 2×, 3×, 5× ou 10×; chance de Mini, Minor e Major.", Rect2(80, 1111, 864, 80), 20, Color("b6cbce"))
+		if game.bonus.jackpot_name != "":
+			text(game.bonus.jackpot_name + "!", Rect2(80, 355, 864, 40), 27, gold)
+
+func refresh():
+	for key in ["cards", "sound", "menu", "minus", "plus", "play", "extra", "coin", "reset", "preview"]:
+		controls[key].visible = modal_kind == ""
+	var idle = game._can_configure() and not busy and modal_kind == ""
+	for key in ["cards", "minus", "plus", "coin", "reset", "preview", "menu"]:
+		controls[key].disabled = not idle
+	controls.minus.disabled = not idle or game.bet <= 1
+	controls.plus.disabled = not idle or game.bet >= 20
+	controls.play.disabled = busy or modal_kind != "" or not (game._can_configure() or game.phase == "extras") or (game._can_configure() and game.credits < game.bet)
+	controls.play.text = "FINALIZAR" if game.phase == "extras" else "JOGAR  ·  " + money(game.bet * game.denomination)
+	controls.extra.disabled = busy or modal_kind != "" or game.phase != "extras" or game.credits < game.extra_quote()
+	controls.extra.text = "EXTRA  ·  " + money(game.extra_quote() * game.denomination)
+	controls.coin.text = "CRÉDITO " + money(game.denomination)
+	controls.sound.text = "SOM ON" if sound_enabled else "SOM OFF"
+	save_settings()
+	publish_state()
+	update()
+
+func settle():
+	busy = false
+	if game.phase in ["bonus", "joker"]:
+		open_modal(game.phase)
+	else:
+		if game.extras_bought > 0:
+			status_message += " Rodada concluída." if game.phase == "finished" else " Confira o próximo preço."
+		elif game.jackpot_won:
+			status_message = "BINGO! Acumulado de " + money(game.jackpot) + " creditado."
+		else:
+			status_message = "30 bolas resolvidas. Confira o preço da próxima extra ou finalize."
+	refresh()
+
+func play():
+	if busy or modal_kind != "":
+		return
+	if game.phase == "extras":
+		game.finish_round()
+		status_message = "Rodada encerrada. Ganhos: %d créditos." % game.round_wins
+	elif game.start_round():
+		game.draw_initial()
+		busy = true
+		reveal_time = 0.0
+		audio.play_cue("start")
+		status_message = "30 bolas sorteadas instantaneamente. Coletando bolas coloridas…"
+	refresh()
+
+func buy_extra():
+	if busy or modal_kind != "":
+		return
+	var number = game.buy_extra()
+	if number >= 0:
+		audio.play_cue("extra")
+		status_message = "EXTRA GRÁTIS! " if game.last_extra_free else "Extra: %d créditos. " % game.last_extra_cost
+		status_message += "Escolha o número Joker." if number == 0 else "Bola %02d." % number
+		busy = true
+		reveal_time = 1.2
+	refresh()
+
+func open_modal(kind):
+	modal_kind = kind
+	for b in modal_buttons:
+		b.queue_free()
+	modal_buttons.clear()
+	if kind == "joker":
+		var options = game.joker_options()
+		for i in range(options.size()):
+			var b = button("choice", "%02d" % options[i], Rect2(105 + i % 10 * 81, 474 + int(i / 10) * 77, 70, 62), "choose_joker", [options[i]])
+			modal_buttons.append(b)
+	elif kind == "bonus":
+		modal_buttons.append(button("spin", "GIRAR GRÁTIS" if game.bonus.spins_left > 0 else "VOLTAR AO BINGO", Rect2(277, 1220, 470, 72), "spin_bonus"))
+	else:
+		modal_buttons.append(button("close", "VOLTAR", Rect2(277, 1220, 470, 72), "close_modal"))
+	refresh()
+
+func close_modal():
+	for b in modal_buttons:
+		b.queue_free()
+	modal_buttons.clear()
+	modal_kind = ""
+	refresh()
+
+func choose_joker(number):
+	if game.choose_joker(number):
+		close_modal()
+		settle()
+
+func spin_bonus():
+	if spin_time > 0:
+		return
+	if game.bonus.spins_left == 0:
+		if preview_bonus:
+			preview_bonus = false
+		else:
+			game.close_bonus()
+		close_modal()
+		return
+	if preview_bonus:
+		game.bonus.spin()
+	else:
+		game.spin_bonus()
+	spin_time = 0.7
+	controls.spin.disabled = true
+	audio.play_cue("ball")
+	refresh()
+
+func preview():
+	if not game._can_configure() or busy:
+		return
+	preview_bonus = true
+	game.bonus.begin([true, true, true], game.bet, game.denomination)
+	open_modal("bonus")
+
+func show_rules():
+	if game._can_configure() and not busy:
+		open_modal("rules")
+
+func change_cards():
+	if game.change_cards() and not busy:
+		audio.play_cue("cards")
+		refresh()
+
+func set_bet(delta):
+	game.set_bet(game.bet + delta)
+	refresh()
+
+func toggle_coin():
+	game.set_denomination(25 if game.denomination == 10 else 10)
+	refresh()
+
+func reset_demo():
+	game.reset_demo()
+	refresh()
+
+func toggle_sound():
+	sound_enabled = not sound_enabled
+	audio.set_enabled(sound_enabled)
+	refresh()
+
+func _process(delta):
+	elapsed += delta
+	if busy:
+		reveal_time += delta
+		if reveal_time >= 2.0:
+			settle()
+	if spin_time > 0:
+		spin_time -= delta
+		if spin_time <= 0:
+			open_modal("bonus")
+	update()
+
+func save_settings():
+	var cfg = ConfigFile.new()
+	cfg.set_value("board", "coin", game.denomination)
+	cfg.set_value("board", "sound", sound_enabled)
+	cfg.save("user://board_settings.cfg")
+
+func load_settings():
+	var cfg = ConfigFile.new()
+	if cfg.load("user://board_settings.cfg") == OK:
+		game.set_denomination(int(cfg.get_value("board", "coin", 10)))
+		sound_enabled = bool(cfg.get_value("board", "sound", true))
+
+func _browser_command(args):
+	if args.empty():
+		return
+	var cmd = str(args[0])
+	if cmd.begins_with("joker:") and modal_kind == "joker":
+		choose_joker(int(cmd.substr(6)))
+		return
+	if cmd == "spin" and modal_kind == "bonus":
+		spin_bonus()
+		return
+	if cmd == "close" and modal_kind == "rules":
+		close_modal()
+		return
+	if cmd == "sound":
+		toggle_sound()
+		return
+	if modal_kind != "" or busy:
+		return
+	match cmd:
+		"play": play()
+		"extra": buy_extra()
+		"cards": change_cards()
+		"minus": set_bet(-1)
+		"plus": set_bet(1)
+		"coin10":
+			game.set_denomination(10)
+			refresh()
+		"coin25":
+			game.set_denomination(25)
+			refresh()
+		"reset": reset_demo()
+		"preview": preview()
+		"rules": show_rules()
+
+func publish_state():
+	if not OS.has_feature("JavaScript"):
+		return
+	var state = {"phase": game.phase, "modal": modal_kind, "busy": busy, "cards": game.cards, "drawn": game.drawn, "credits": game.credits, "bet": game.bet, "denomination": game.denomination, "extras": game.extras_bought, "extra_cost": game.extra_quote(), "status": status_message, "sound": sound_enabled, "can_play": not controls.play.disabled, "can_extra": not controls.extra.disabled, "can_configure": not controls.cards.disabled, "wins": game.wins, "round_wins": game.round_wins, "collections": game.collections, "joker_options": game.joker_options(), "bonus_grid": game.bonus.grid, "bonus_spins": game.bonus.spins_left, "bonus_total": game.bonus.total, "bonus_multiplier": game.bonus.last_multiplier, "bonus_flags": game.bonus.flags, "spin_busy": spin_time > 0, "preview": preview_bonus}
+	JavaScript.eval("window.onPotionState && window.onPotionState(" + JSON.print(state) + ");", true)
+
+func _has_collected(color):
+	for event in game.ball_events:
+		if event.color == color and event.collected:
+			return true
+	return false
+
+func draw_symbol(id, pos, color):
+	if id == 0 or id == 1:
+		draw_rect(Rect2(pos.x-15, pos.y-4, 30, 24), color)
+		draw_colored_polygon(PoolVector2Array([pos+Vector2(-22,-4),pos+Vector2(0,-22),pos+Vector2(22,-4)]), color)
+		draw_rect(Rect2(pos.x-4, pos.y+6, 8, 14), ink)
+		if id == 1:
+			draw_rect(Rect2(pos.x-9,pos.y-1,5,5),ink)
+			draw_rect(Rect2(pos.x+5,pos.y-1,5,5),ink)
+	elif id == 2:
+		box(Rect2(pos.x-25,pos.y-10,50,24),color,color,5)
+		draw_rect(Rect2(pos.x-18,pos.y-20,15,13),color)
+		for x in [-14,14]: draw_circle(pos+Vector2(x,17),6,color)
+	elif id == 3:
+		draw_arc(pos+Vector2(-12,-4),11,0,TAU,24,color,5)
+		draw_line(pos+Vector2(-1,-4),pos+Vector2(23,-4),color,5)
+		draw_line(pos+Vector2(16,-4),pos+Vector2(16,8),color,5)
+	elif id == 4:
+		box(Rect2(pos.x-20,pos.y-20,40,40),color,color,7)
+		for offset in [Vector2(-10,-10),Vector2(10,-10),Vector2.ZERO,Vector2(-10,10),Vector2(10,10)]:
+			draw_circle(pos+offset,3,ink)
+	else:
+		draw_circle(pos,21,color)
+		draw_arc(pos,15,0,TAU,32,ink,2)
+		text("$",Rect2(pos.x-15,pos.y-16,30,30),25,ink)

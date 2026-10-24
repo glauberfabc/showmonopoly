@@ -1,0 +1,10 @@
+closed.png: 17_38_33-1.png
+fill-1.png: 17_38_34-2.png
+fill-2.png: 17_38_35-3.png
+fill-3.png: 17_38_36-4.png
+fill-4.png: 17_38_37-5.png
+fill-5.png: 17_38_38-7.png
+pressure.png: 17_38_38-6.png
+cracked.png: 17_38_39-8.png
+burst.png: 17_38_40-9.png
+open.png: 17_38_40-10.png

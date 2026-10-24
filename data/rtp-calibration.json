@@ -1,0 +1,10 @@
+{
+  "rounds": 110000,
+  "bet_per_card": 8,
+  "cards_open": 4,
+  "strategy": "compra todas as extras; Joker escolhe o melhor número",
+  "figures_pct_of_stake": 363.95,
+  "bonus_pct_of_stake": 19.54,
+  "hold_to_factor": {"4":0.823,"5":0.835,"6":0.849,"7":0.863,"8":0.878,"9":0.892,"10":0.907,"11":0.919,"12":0.93,"13":0.943,"14":0.955,"15":0.967,"16":0.984,"17":1.001,"18":1.02,"19":1.037,"20":1.058},
+  "notice": "Simulação própria, sem certificação. Incerteza ≈ ±1,5 pp. Com aposta 1 por cartela o RTP medido ≈ 67% (piso de 1 crédito por extra)."
+}

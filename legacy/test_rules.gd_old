@@ -1,0 +1,194 @@
+extends SceneTree
+# Run: godot --path . --no-window -s tests/test_rules.gd
+const Rules = preload("res://scripts/game_rules.gd")
+var failures = 0
+
+func test_closed_cards():
+	var game = Rules.new()
+	for i in range(4):
+		check(game.toggle_card(i), "Can close card before round")
+	check(not game.start_round() and game.credits == 1000, "All closed blocks round without charge")
+	check(game.toggle_card(1) and game.start_round(), "One active card allows round")
+	check(not game.toggle_card(1), "Cannot change participating cards after debit")
+	game.cards = late_cards()
+	game.cards[0] = range(1, 16)
+	game.deck = ordered_deck()
+	for _i in range(30):
+		game.draw_next()
+	check(not game.jackpot_won and game.credits == 999, "Closed winning card does not pay jackpot")
+	game.finish_round()
+	game.reset_demo()
+	check(game.card_enabled.count(true) == 4, "Demo reset restores four active cards")
+
+func check(condition, message):
+	if not condition:
+		failures += 1
+		printerr("FAIL: " + message)
+
+func ordered_deck():
+	var result = []
+	for value in range(1, 76):
+		result.append(value)
+	return result
+
+func late_cards():
+	var card = []
+	for value in range(31, 46):
+		card.append(value)
+	return [card.duplicate(), card.duplicate(), card.duplicate(), card.duplicate()]
+
+func _init():
+	test_closed_cards()
+	test_card_selection()
+	test_jackpot_matrix()
+	test_phase_guards()
+	test_random_decks()
+	var game = Rules.new()
+	check(game.cards.size() == 4, "Four cards at initialization")
+	for card in game.cards:
+		check(card.size() == 15, "Fifteen numbers per card")
+		var unique = {}
+		for number in card:
+			check(number >= 1 and number <= 75, "Number range")
+			unique[number] = true
+		check(unique.size() == 15, "Unique card numbers")
+		var sorted_card = card.duplicate()
+		sorted_card.sort()
+		for row in range(3):
+			for column in range(5):
+				check(card[row * 5 + column] == sorted_card[column * 3 + row], "Cards ascend down each column")
+	check(not game.set_bet(0) and not game.set_bet(21), "Bet bounds")
+	check(not game.set_bet(1.5), "Integer bets only")
+	check(game.set_bet(20), "Maximum bet accepted")
+	check(not game.set_denomination(100), "Unsupported denomination")
+	check(game.set_denomination(25), "Twenty-five cents accepted")
+	game.credits = 19
+	check(not game.start_round() and game.credits == 19, "Insufficient balance is unchanged")
+	game.reset_demo()
+	check(game.credits == 1000 and game.phase == "ready", "Demo reset")
+	check(game.start_round() and game.credits == 980, "Stake debited once")
+	check(not game.start_round() and game.credits == 980, "No duplicate round charge")
+	check(not game.set_bet(1) and not game.set_denomination(10), "Settings locked during round")
+	check(game.buy_extra() == -1 and not game.finish_round(), "Initial draws cannot be skipped")
+	var unique_deck = {}
+	for number in game.deck:
+		unique_deck[number] = true
+	check(unique_deck.size() == 75 and game.deck.size() == 75, "Complete unique deck")
+	game.deck = ordered_deck()
+	game.cards = late_cards()
+	for index in range(30):
+		check(game.draw_next() == index + 1, "Controlled initial draw")
+	check(game.phase == "extras" and game.drawn.size() == 30, "Exactly thirty initial balls")
+	check(game.draw_next() == -1, "No free extra draw")
+	game.credits = 19
+	check(game.buy_extra() == -1 and game.extras_bought == 0 and game.drawn.size() == 30, "Unaffordable extra changes nothing")
+	game.credits = 200
+	for index in range(10):
+		check(game.buy_extra() == 31 + index, "Extra draw")
+	check(game.credits == 0 and game.phase == "finished", "Ten paid extras finish")
+	check(game.buy_extra() == -1 and game.drawn.size() == 40, "Ten extra limit")
+	game.reset_demo()
+	game.start_round()
+	game.deck = ordered_deck()
+	var winning_card = []
+	for number in range(1, 16):
+		winning_card.append(number)
+	game.cards = [winning_card, winning_card.duplicate(), winning_card.duplicate(), winning_card.duplicate()]
+	for _index in range(30):
+		game.draw_next()
+	check(game.jackpot_won and game.phase == "finished", "Initial-ball jackpot")
+	check(game.credits == 20980, "Jackpot converted from cents and paid once")
+	check(game.draw_next() == -1 and game.buy_extra() == -1 and game.credits == 20980, "Prize cannot be claimed twice")
+	game.reset_demo()
+	game.start_round()
+	game.deck = ordered_deck()
+	winning_card.remove(14)
+	winning_card.append(31)
+	game.cards = [winning_card]
+	for _index in range(30):
+		game.draw_next()
+	game.buy_extra()
+	check(game.matches(winning_card) == 15 and not game.jackpot_won and game.credits == 960, "Extra-ball completion has no jackpot")
+	check(game.finish_round() and game.phase == "finished", "Optional early finish")
+	check(game.set_bet(1) and game.set_denomination(10), "Settings unlocked after finish")
+	print("Potion Master rules: " + str(failures) + " failure(s)")
+	quit(0 if failures == 0 else 1)
+
+func test_jackpot_matrix():
+	for denomination in [10, 25]:
+		for stake in [1, 20]:
+			var game = Rules.new()
+			game.set_denomination(denomination)
+			game.set_bet(stake)
+			game.start_round()
+			game.deck = ordered_deck()
+			var card = []
+			for number in range(16, 31):
+				card.append(number)
+			game.cards = [card, card.duplicate(), card.duplicate(), card.duplicate()]
+			for _index in range(29):
+				game.draw_next()
+			check(not game.jackpot_won and game.credits == 1000 - stake, "No prize before initial draw finishes")
+			check(game.draw_next() == 30, "Thirtieth ball can complete a card")
+			var expected = 1000 - stake + int(500000 / denomination)
+			check(game.jackpot_won and game.credits == expected, "Jackpot matrix denomination=" + str(denomination) + " bet=" + str(stake))
+			check(game.draw_next() == -1 and game.buy_extra() == -1 and game.credits == expected, "No repeated matrix prize")
+			check(game.start_round() and not game.jackpot_won and game.drawn.empty(), "New round clears prize flag")
+			check(game.credits == expected - stake, "New round debits fresh stake")
+
+func test_phase_guards():
+	var game = Rules.new()
+	check(game.draw_next() == -1 and game.buy_extra() == -1 and not game.finish_round(), "Ready phase rejects round operations")
+	check(not game.set_denomination(10.0) and not game.set_bet("20"), "Configuration rejects noninteger inputs")
+	game.start_round()
+	game.deck = ordered_deck()
+	game.cards = late_cards()
+	game.draw_next()
+	check(not game.reset_demo() and game.credits == 999 and game.drawn == [1] and game.phase == "drawing", "Reset blocked during initial draw")
+	for _index in range(29):
+		game.draw_next()
+	check(not game.reset_demo() and game.credits == 999 and game.drawn.size() == 30 and game.phase == "extras", "Reset blocked during extras")
+	check(not game.set_bet(20) and not game.set_denomination(25) and not game.start_round(), "Extras phase locks settings and start")
+	check(game.bet == 1 and game.denomination == 10 and game.credits == 999, "Rejected operations preserve settings and balance")
+	game.finish_round()
+	check(not game.finish_round() and game.buy_extra() == -1 and game.draw_next() == -1, "Finished phase rejects old round operations")
+	check(game.reset_demo() and game.credits == 1000 and game.drawn.empty() and game.deck.empty() and game.extras_bought == 0 and not game.jackpot_won, "Finished reset clears round state")
+
+func test_random_decks():
+	for _round_index in range(100):
+		var game = Rules.new()
+		game.start_round()
+		var original = game.deck.duplicate()
+		var unique = {}
+		for number in original:
+			check(number >= 1 and number <= 75, "Random deck number range")
+			unique[number] = true
+		check(unique.size() == 75 and original.size() == 75, "Random deck contains all seventy-five numbers")
+		# Use the last fifteen deck values so this test always reaches ten extras.
+		var card = []
+		for index in range(60, 75):
+			card.append(original[index])
+		game.cards = [card]
+		for index in range(30):
+			check(game.draw_next() == original[index], "Initial draw consumes shuffled deck in order")
+		for index in range(10):
+			check(game.buy_extra() == original[30 + index], "Extra draw continues shuffled deck")
+		unique.clear()
+		for number in game.drawn:
+			unique[number] = true
+		check(unique.size() == 40 and game.deck.size() == 35 and game.credits == 989, "Forty unique balls cost eleven single-credit stakes")
+
+func test_card_selection():
+	var game = Rules.new()
+	var before = game.cards.duplicate(true)
+	check(game.change_cards() and game.cards != before and game.credits == 1000, "Cards change for free before a round")
+	var selected = game.cards.duplicate(true)
+	check(game.start_round() and game.cards == selected, "Playing preserves the selected visible cards")
+	check(not game.change_cards() and game.cards == selected, "Cards cannot change during initial draw")
+	game.cards = late_cards()
+	game.deck = ordered_deck()
+	for _i in range(30):
+		game.draw_next()
+	check(not game.change_cards() and game.drawn.size() == 30, "Cards cannot change during extras")
+	game.finish_round()
+	check(game.change_cards() and game.drawn.empty() and game.phase == "ready" and game.credits == 999, "New selection clears old round without charging")

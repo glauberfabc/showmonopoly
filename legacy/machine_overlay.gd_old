@@ -1,0 +1,155 @@
+extends Node2D
+# Transparent animation layer, centered over the reference art's glass chamber.
+var spinning = false
+var last_ball = 0
+var elapsed = 0.0
+var reveal_age = 1.0
+var speed = 0.7
+var speed_multiplier = 1.0
+var reveal_duration = 0.18
+var motion_time = 0.0
+var balls = []
+var small_font = null
+var large_font = null
+const MIX = [7, 42, 16, 63, 29, 74, 11, 56, 35, 68, 22, 49, 3, 60]
+
+func _ready():
+	var font_data = load("res://assets/ui.ttf")
+	small_font = DynamicFont.new()
+	small_font.font_data = font_data
+	small_font.size = 17
+	large_font = DynamicFont.new()
+	large_font.font_data = font_data
+	large_font.size = 36
+	for i in range(MIX.size()):
+		var a = float(i) * 2.39996
+		balls.append({"position": Vector2(cos(a), sin(a)) * (25.0 + float(i % 5) * 15.0), "velocity": Vector2(sin(a * 1.7), -cos(a * 1.3)).normalized() * (220.0 + float(i % 4) * 37.0), "number": MIX[i], "purple": i % 3 == 0})
+	update()
+
+func set_spinning(value):
+	spinning = bool(value)
+
+func set_speed(multiplier):
+	speed_multiplier = clamp(float(multiplier), 0.25, 6.0)
+
+func reveal_ball(number):
+	last_ball = int(number)
+	reveal_age = 0.0
+	update()
+
+func reset():
+	spinning = false
+	last_ball = 0
+	reveal_age = 1.0
+	update()
+
+func _process(delta):
+	elapsed += delta
+	reveal_age += delta
+	speed = lerp(speed, 1.55 if spinning else 0.70, min(delta * 5.0, 1.0))
+	# Fixed small steps keep fast rebounds stable even at the highest UI speed.
+	var remaining = min(delta, 0.06) * speed * speed_multiplier
+	while remaining > 0.00001:
+		var step = min(remaining, 0.008)
+		motion_time += step
+		_simulate(step)
+		remaining -= step
+	update()
+
+func _simulate(step):
+	for i in range(balls.size()):
+		var p = balls[i]["position"]
+		var v = balls[i]["velocity"]
+		# Gravity plus a pulsing air jet sends the balls up through the chamber.
+		v += Vector2(sin(motion_time * 5.0 + float(i)) * 125.0, 290.0) * step
+		if p.y > 42.0 and v.y > 0.0:
+			v.y -= (800.0 + 250.0 * sin(motion_time * 7.0 + float(i))) * step
+		var magnitude = v.length()
+		if magnitude > 410.0:
+			v = v.normalized() * 410.0
+		elif magnitude < 190.0:
+			v = v.normalized() * 190.0 if magnitude > 0.01 else Vector2(125, -205)
+		p += v * step
+		# Radius 98 + maximum ball 18 + shadow 4 stays inside the painted glass.
+		if p.length() > 98.0:
+			var normal = p.normalized()
+			p = normal * 98.0
+			if v.dot(normal) > 0.0:
+				v = v.bounce(normal).rotated(sin(motion_time + float(i)) * 0.07)
+		balls[i]["position"] = p
+		balls[i]["velocity"] = v
+	# Pair impacts prevent the balls from passing through their neighbors.
+	for i in range(balls.size()):
+		for j in range(i + 1, balls.size()):
+			var offset = balls[j]["position"] - balls[i]["position"]
+			var distance = offset.length()
+			if distance < 27.0 and distance > 0.001:
+				var normal = offset / distance
+				var separation = normal * (27.0 - distance) * 0.5
+				balls[i]["position"] -= separation
+				balls[j]["position"] += separation
+				var relative = (balls[j]["velocity"] - balls[i]["velocity"]).dot(normal)
+				if relative < 0.0:
+					balls[i]["velocity"] += normal * relative
+					balls[j]["velocity"] -= normal * relative
+	for ball in balls:
+		if ball["position"].length() > 98.0:
+			ball["position"] = ball["position"].normalized() * 98.0
+
+func _text_at(center, number, font, color):
+	if font == null:
+		return
+	var text = str(number)
+	var size = font.get_string_size(text)
+	draw_string(font, center + Vector2(-size.x * 0.5, (font.get_ascent() - font.get_descent()) * 0.5), text, color)
+
+func _ball(center, radius, purple, number, show_number, large = false):
+	# Nested offset discs create a soft lit volume without requiring textures.
+	var shade = Color("351448") if purple else Color("704023")
+	var mid = Color("965cb5") if purple else Color("daa348")
+	var light = Color("edc9ff") if purple else Color("fff3bb")
+	draw_circle(center + Vector2(1.5, 2.5), radius + 0.8, Color(0.035, 0.01, 0.04, 0.38))
+	draw_circle(center, radius, shade)
+	for i in range(13):
+		var t = float(i) / 12.0
+		var p = center + Vector2(-radius * 0.20, -radius * 0.23) * t
+		draw_circle(p, radius * (0.95 - t * 0.44), mid.linear_interpolate(light, t * 0.90))
+	if show_number:
+		draw_circle(center + Vector2(0.5, 1), radius * 0.62, Color(1, 0.96, 0.81, 0.90))
+		_text_at(center + Vector2(0.5, 0), number, large_font if large else small_font, Color("45233b"))
+	draw_circle(center + Vector2(-radius * 0.37, -radius * 0.43), radius * 0.16, Color(1, 1, 1, 0.72))
+	draw_arc(center, radius * 0.87, 3.65, 4.8, 14, Color(1, 0.95, 1, 0.35), 1.4, true)
+
+func _draw():
+	# Faint interior curls stay entirely inside the painted globe.
+	for i in range(3):
+		var phase = elapsed * (0.5 + float(i) * 0.12)
+		draw_arc(Vector2.ZERO, 65.0 + float(i) * 14.0, phase, phase + 1.6, 24, Color(0.90, 0.68, 1, 0.05 if not spinning else 0.12), 1.8, true)
+	# Back-to-front rendering keeps the fast bouncing balls readable in depth.
+	var ordered = []
+	for i in range(balls.size()):
+		var ball = balls[i]
+		var depth = sin(motion_time * 1.4 + float(i) * 0.83)
+		var p = ball["position"]
+		ordered.append({"position": p, "depth": depth, "radius": 12.0 + (depth + 1.0) * 3.0, "purple": ball["purple"], "number": ball["number"], "show": i % 3 != 1})
+	ordered.sort_custom(self, "_depth_less")
+	for ball in ordered:
+		_ball(ball["position"], ball["radius"], ball["purple"], ball["number"], ball["show"] and ball["depth"] > -0.4)
+	for i in range(18):
+		var a = float(i) * 2.39996 + elapsed * 0.25
+		var r = 42.0 + float(i % 6) * 10.0
+		var alpha = (sin(elapsed * 2.2 + float(i)) * 0.5 + 0.5) * (0.65 if spinning else 0.20)
+		var p = Vector2(cos(a) * r, sin(a) * r * 0.88)
+		draw_circle(p, 1.0 + float(i % 2) * 0.6, Color(1, 0.86, 0.56, alpha))
+	if last_ball > 0:
+		var t = clamp(reveal_age / max(reveal_duration, 0.01), 0.0, 1.0)
+		var smooth = t * t * (3.0 - 2.0 * t)
+		var p = Vector2(sin(t * PI) * 14.0, smooth * 230.0)
+		var radius = lerp(20.0, 31.0, smooth)
+		for i in range(3, 0, -1):
+			draw_circle(p, radius + float(i) * 5.0, Color(1, 0.74, 0.28, 0.035))
+		_ball(p, radius, false, last_ball, true, true)
+
+func _depth_less(a, b):
+	return a["depth"] < b["depth"]
+

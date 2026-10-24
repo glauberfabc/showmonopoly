@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/voice_mega_big_win.mp3-9e36260da8eeb97a86c45349a1d635ee.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/voice_mega_big_win.mp3"
+dest_files=[ "res://.import/voice_mega_big_win.mp3-9e36260da8eeb97a86c45349a1d635ee.mp3str" ]
+
+[params]
+
+loop=false
+loop_offset=0

@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/reel_stop1.mp3-17051f43fca1de49885ff3e07179e778.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/reel_stop1.mp3"
+dest_files=[ "res://.import/reel_stop1.mp3-17051f43fca1de49885ff3e07179e778.mp3str" ]
+
+[params]
+
+loop=false
+loop_offset=0

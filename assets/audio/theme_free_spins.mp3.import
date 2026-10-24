@@ -1,0 +1,15 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+path="res://.import/theme_free_spins.mp3-2a4bdd11e5699b62779d0e8373ae95ca.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/theme_free_spins.mp3"
+dest_files=[ "res://.import/theme_free_spins.mp3-2a4bdd11e5699b62779d0e8373ae95ca.mp3str" ]
+
+[params]
+
+loop=true
+loop_offset=0

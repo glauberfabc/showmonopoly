@@ -1,0 +1,242 @@
+{
+  "ball_fast": {
+    "start": 0,
+    "end": 0.125011
+  },
+  "ball": {
+    "start": 0.375011,
+    "end": 0.500023
+  },
+  "ball2": {
+    "start": 0.750023,
+    "end": 0.875034
+  },
+  "bola_extra_announce": {
+    "start": 1.125034,
+    "end": 2.193946
+  },
+  "bola_extra_bg": {
+    "start": 2.443946,
+    "end": 6.035556
+  },
+  "bola_extra_caiguda": {
+    "start": 6.285556,
+    "end": 6.852585
+  },
+  "bola_extra_cancel": {
+    "start": 7.102585,
+    "end": 7.540091
+  },
+  "bola_extra_cover_quickly": {
+    "start": 7.790091,
+    "end": 9.179388
+  },
+  "bola_extra_cover": {
+    "start": 9.429388,
+    "end": 10.893197
+  },
+  "bola_extra_una_de_bingo": {
+    "start": 11.143197,
+    "end": 13.643197
+  },
+  "bola_extra_una_de_bonus": {
+    "start": 13.893197,
+    "end": 15.580703
+  },
+  "bola_extra_una_de_hotjackpot": {
+    "start": 15.830703,
+    "end": 18.848299
+  },
+  "bola_extra_una_de_mistery_pot": {
+    "start": 19.098299,
+    "end": 21.403288
+  },
+  "bola_extra_una_de_superbingo": {
+    "start": 21.653288,
+    "end": 24.590794
+  },
+  "bola_gratis_announce_voz": {
+    "start": 24.840794,
+    "end": 26.753197
+  },
+  "bola_lenta_BG_loop": {
+    "start": 27.003197,
+    "end": 36.98737
+  },
+  "bola_lenta_push_botton_1": {
+    "start": 37.23737,
+    "end": 37.73737
+  },
+  "bola_lenta_push_botton_2": {
+    "start": 37.98737,
+    "end": 38.48737
+  },
+  "bola_lenta_push_botton_3": {
+    "start": 38.73737,
+    "end": 39.23737
+  },
+  "bola_lenta_push_botton_4": {
+    "start": 39.48737,
+    "end": 39.98737
+  },
+  "bola_lenta_push_botton_5": {
+    "start": 40.23737,
+    "end": 40.73737
+  },
+  "bola_lenta_push_botton_6": {
+    "start": 40.98737,
+    "end": 41.48737
+  },
+  "bola_lenta_push_botton_7": {
+    "start": 41.73737,
+    "end": 42.23737
+  },
+  "bola_lenta_push_botton_8": {
+    "start": 42.48737,
+    "end": 42.98737
+  },
+  "bola_wild_announce": {
+    "start": 43.23737,
+    "end": 44.977098
+  },
+  "bola_wild_bg": {
+    "start": 45.227098,
+    "end": 48.152449
+  },
+  "cannot_play": {
+    "start": 48.402449,
+    "end": 48.899388
+  },
+  "card_decrease": {
+    "start": 49.149388,
+    "end": 50.149388
+  },
+  "card_increase": {
+    "start": 50.399388,
+    "end": 50.853243
+  },
+  "change_bet": {
+    "start": 51.103243,
+    "end": 51.186576
+  },
+  "change_cards": {
+    "start": 51.436576,
+    "end": 51.644921
+  },
+  "collect_announce": {
+    "start": 51.894921,
+    "end": 53.392063
+  },
+  "hit_1": {
+    "start": 53.642063,
+    "end": 54.194717
+  },
+  "hit_2": {
+    "start": 54.444717,
+    "end": 55.01966
+  },
+  "hit_3": {
+    "start": 55.26966,
+    "end": 55.786599
+  },
+  "hit_4": {
+    "start": 56.036599,
+    "end": 56.561429
+  },
+  "hit_5": {
+    "start": 56.811429,
+    "end": 57.285057
+  },
+  "hit_6": {
+    "start": 57.535057,
+    "end": 58.12229
+  },
+  "increase_prize": {
+    "start": 58.37229,
+    "end": 58.835556
+  },
+  "insert_coin": {
+    "start": 59.085556,
+    "end": 59.559728
+  },
+  "intro_bonus": {
+    "start": 59.809728,
+    "end": 71.245261
+  },
+  "intro_mistery": {
+    "start": 71.495261,
+    "end": 79.132449
+  },
+  "prize_a-b": {
+    "start": 79.382449,
+    "end": 79.683061
+  },
+  "prize_bingo": {
+    "start": 79.933061,
+    "end": 116.66415
+  },
+  "prize_c-d": {
+    "start": 116.91415,
+    "end": 118.371519
+  },
+  "prize_counter_appear": {
+    "start": 118.621519,
+    "end": 119.517438
+  },
+  "prize_counter_bonus_prize": {
+    "start": 119.767438,
+    "end": 119.991701
+  },
+  "prize_counter_loop": {
+    "start": 120.241701,
+    "end": 127.346984
+  },
+  "prize_e": {
+    "start": 127.596984,
+    "end": 130.155351
+  },
+  "prize_f": {
+    "start": 130.405351,
+    "end": 132.963719
+  },
+  "prize_g": {
+    "start": 133.213719,
+    "end": 142.425011
+  },
+  "prize_h": {
+    "start": 142.675011,
+    "end": 151.675011
+  },
+  "prize_i": {
+    "start": 151.925011,
+    "end": 169.237551
+  },
+  "prize_j": {
+    "start": 169.487551,
+    "end": 180.923084
+  },
+  "prize_k": {
+    "start": 181.173084,
+    "end": 200.625578
+  },
+  "prize_myst": {
+    "start": 200.875578,
+    "end": 207.814921
+  },
+  "redoble": {
+    "start": 208.064921,
+    "end": 209.52873
+  },
+  "show_circulo_rosa_counter": {
+    "start": 209.77873,
+    "end": 224.533469
+  },
+  "start_game": {
+    "start": 224.783469,
+    "end": 225.163741
+  },
+  "superb": {
+    "start": 225.413741,
+    "end": 262.779819
+  }
+}

@@ -1,0 +1,11 @@
+.import/
+export.cfg
+*.tmp
+tests/*-output.log
+tests/*-error.log
+tools/web_templates/
+web/build/
+web/server*.log
+web/server.pid
+web/export*.log
+.deploy/

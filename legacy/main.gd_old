@@ -1,0 +1,535 @@
+extends Control
+
+const Rules = preload("res://scripts/game_rules.gd")
+const Potion = preload("res://scripts/potion_overlay.gd")
+const Machine = preload("res://scripts/machine_overlay.gd")
+const BallSlot = preload("res://scripts/ball_slot.gd")
+var game = Rules.new()
+var fonts = {}
+var cells = []
+var initial_balls = []
+var extra_balls = []
+var pots = []
+var machine
+var credit_label
+var bet_label
+var denomination_label
+var status_label
+var count_label
+var play_button
+var play_caption
+var play_cover
+var extra_button
+var extra_caption
+var minus_button
+var plus_button
+var menu_button
+var cards_button
+var card_buttons = []
+var speed_button
+var sound_button
+var audio
+var speed_index = 1
+var sound_enabled = true
+const SPEEDS = [0.44, 0.22, 0.11]
+var browser_callback
+var settings
+var menu_shade
+var settings_coin
+var coin_buttons = []
+var timer
+var extra_timer
+var speed = 0.22
+var extra_animating = false
+var gold = Color("ffdf82")
+var colors = [Color("6fff38"), Color("ff3850"), Color("35d6ff"), Color("c762ff")]
+var last_number = 0
+var hit_age = 10.0
+var win_age = -1.0
+var status_message = ""
+var status_time = 0.0
+var menu_open = false
+
+func font(size, title = false):
+	var key = str(size) + str(title)
+	if not fonts.has(key):
+		var f = DynamicFont.new()
+		f.font_data = load("res://assets/numbers.ttf" if title else "res://assets/ui.ttf")
+		f.size = size
+		fonts[key] = f
+	return fonts[key]
+
+func style(color, border = Color("c69448"), radius = 16):
+	var s = StyleBoxFlat.new()
+	s.bg_color = color
+	s.border_color = border
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(radius)
+	return s
+
+func label_at(text, rect, size = 24, color = Color("fff0cc"), title = false, parent = null):
+	var l = Label.new()
+	l.text = text
+	l.rect_position = rect.position
+	l.rect_size = rect.size
+	l.align = Label.ALIGN_CENTER
+	l.valign = Label.VALIGN_CENTER
+	l.add_font_override("font", font(size, title))
+	l.add_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	(parent if parent != null else self).add_child(l)
+	return l
+
+func button(text, rect, method, color = Color("43205c"), parent = null):
+	var b = Button.new()
+	b.text = text
+	b.rect_position = rect.position
+	b.rect_size = rect.size
+	b.add_font_override("font", font(23))
+	b.add_stylebox_override("normal", style(color))
+	b.add_stylebox_override("hover", style(color.lightened(0.17), gold))
+	b.add_stylebox_override("pressed", style(color.darkened(0.18), Color.white))
+	b.add_stylebox_override("disabled", style(Color("21162c"), Color("51405b")))
+	b.connect("pressed", self, method)
+	(parent if parent != null else self).add_child(b)
+	return b
+
+func art_button(rect, method, hint):
+	var b = button("", rect, method)
+	var transparent = StyleBoxEmpty.new()
+	b.add_stylebox_override("normal", transparent)
+	b.add_stylebox_override("disabled", transparent)
+	b.add_stylebox_override("hover", style(Color(1, 0.9, 0.45, 0.08), Color(1, 0.85, 0.4, 0.55), 28))
+	b.add_stylebox_override("pressed", style(Color(0, 0, 0, 0.22), gold, 28))
+	b.add_stylebox_override("focus", style(Color(0, 0, 0, 0), Color(1, 0.85, 0.4, 0.65), 28))
+	b.hint_tooltip = hint
+	return b
+
+func _ready():
+	randomize()
+	load_settings()
+	audio = preload("res://scripts/game_audio.gd").new()
+	add_child(audio)
+	audio.set_enabled(sound_enabled)
+	var bg = TextureRect.new()
+	bg.texture = preload("res://assets/game_plate.png")
+	bg.rect_size = Vector2(1024, 1536)
+	bg.expand = true
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat = ShaderMaterial.new()
+	mat.shader = preload("res://assets/living_art.shader")
+	bg.material = mat
+	add_child(bg)
+	for i in range(3):
+		var p = Potion.new()
+		p.position = [Vector2(192, 279), Vector2(512, 302), Vector2(824, 280)][i]
+		add_child(p)
+		p.configure(colors[i], 1 if i == 1 else 0)
+		p.body_width = 150.0 if i != 1 else 171.0
+		p.body_height = 85.0 if i != 1 else 57.0
+		p.neck_y = -95.0 if i != 1 else -70.0
+		pots.append(p)
+	var glass = TextureRect.new()
+	glass.texture = bg.texture
+	glass.rect_size = bg.rect_size
+	glass.expand = true
+	glass.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var glass_mat = ShaderMaterial.new()
+	glass_mat.shader = preload("res://assets/glass_highlights.shader")
+	glass.material = glass_mat
+	add_child(glass)
+	machine = Machine.new()
+	machine.position = Vector2(512, 741)
+	add_child(machine)
+	for c in range(4):
+		var x = 55 if c % 2 == 0 else 675
+		var y = 667 if c < 2 else 906
+		var card_cells = []
+		for n in range(15):
+			var cell = Panel.new()
+			cell.rect_position = Vector2(x + (n % 5) * 60, y + int(n / 5) * 54)
+			cell.rect_size = Vector2(58, 52)
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.add_stylebox_override("panel", StyleBoxEmpty.new())
+			add_child(cell)
+			var l = label_at("", Rect2(0, 0, 58, 52), 29, Color("201816"), true, cell)
+			card_cells.append([cell, l])
+		cells.append(card_cells)
+		var toggle = art_button(Rect2(x, y, 298, 160), "ignore_card_click", "Abrir ou fechar esta cartela antes da rodada")
+		toggle.disconnect("pressed", self, "ignore_card_click")
+		toggle.connect("pressed", self, "toggle_card", [c])
+		card_buttons.append(toggle)
+	for n in range(30):
+		initial_balls.append(ball_slot(Vector2(91 + (n % 10) * 61.8, 1165 + int(n / 10) * 58.5), 25))
+	for n in range(10):
+		extra_balls.append(ball_slot(Vector2(735 + (n % 5) * 54.7, 1200 + int(n / 5) * 65.5), 24))
+	credit_label = label_at("", Rect2(107, 1400, 171, 55), 46, gold, true)
+	credit_label.add_color_override("font_color_shadow", Color("562407"))
+	credit_label.add_constant_override("shadow_offset_y", 3)
+	bet_label = label_at("", Rect2(447, 1400, 127, 55), 49, gold, true)
+	bet_label.add_color_override("font_color_shadow", Color("562407"))
+	bet_label.add_constant_override("shadow_offset_y", 3)
+	minus_button = art_button(Rect2(342, 1382, 73, 74), "decrease_bet", "Diminuir aposta • mínimo 1")
+	plus_button = art_button(Rect2(607, 1382, 73, 74), "increase_bet", "Aumentar aposta • máximo 20")
+	play_cover = Panel.new()
+	play_cover.rect_position = Vector2(780, 1384)
+	play_cover.rect_size = Vector2(183, 62)
+	play_cover.add_stylebox_override("panel", style(Color("00531b"), Color("08752a"), 9))
+	play_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(play_cover)
+	play_caption = label_at("", Rect2(0, 0, 183, 62), 28, gold, true, play_cover)
+	play_button = art_button(Rect2(708, 1358, 285, 112), "play", "Iniciar uma rodada • 4 cartelas e 30 bolas")
+	extra_button = art_button(Rect2(701, 1161, 279, 145), "buy_extra", "Comprar uma bola extra pelo valor da aposta")
+	extra_caption = label_at("", Rect2(708, 1296, 265, 26), 17, gold)
+	menu_button = button("MENU", Rect2(896, 16, 105, 39), "open_menu", Color(0.09, 0.015, 0.17, 0.92))
+	menu_button.add_font_override("font", font(18))
+	cards_button = button("TROCAR CARTELAS", Rect2(23, 16, 198, 39), "change_cards", Color(0.09, 0.015, 0.17, 0.92))
+	cards_button.add_font_override("font", font(17))
+	speed_button = button("", Rect2(704, 16, 180, 39), "cycle_speed")
+	speed_button.add_font_override("font", font(17))
+	sound_button = button("", Rect2(234, 16, 110, 39), "toggle_sound")
+	sound_button.add_font_override("font", font(17))
+	denomination_label = label_at("", Rect2(105, 1452, 175, 19), 13, Color("fff0b0"))
+	count_label = label_at("", Rect2(703, 1475, 290, 23), 16, gold)
+	var status_bg = Panel.new()
+	status_bg.rect_position = Vector2(102, 1498)
+	status_bg.rect_size = Vector2(820, 29)
+	status_bg.add_stylebox_override("panel", style(Color(0.035, 0.006, 0.055, 0.87), Color(0.8, 0.6, 0.25, 0.5), 12))
+	status_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(status_bg)
+	status_label = label_at("", Rect2(4, 0, 812, 29), 16, Color("ffeab7"), false, status_bg)
+	timer = Timer.new()
+	timer.wait_time = speed
+	timer.connect("timeout", self, "draw_ball")
+	add_child(timer)
+	extra_timer = Timer.new()
+	extra_timer.wait_time = speed
+	extra_timer.one_shot = true
+	extra_timer.connect("timeout", self, "extra_animation_done")
+	add_child(extra_timer)
+	apply_speed()
+	var effects = preload("res://scripts/round_fx.gd").new()
+	effects.game_view = self
+	add_child(effects)
+	build_menu()
+	if OS.has_feature("JavaScript"):
+		browser_callback = JavaScript.create_callback(self, "_browser_command")
+		JavaScript.get_interface("window").potionCommand = browser_callback
+	refresh("Escolha sua aposta e toque em JOGAR.")
+
+func ball_slot(center, radius):
+	var slot = BallSlot.new()
+	slot.rect_position = center - Vector2(radius, radius)
+	slot.rect_size = Vector2(radius * 2, radius * 2)
+	slot.radius = radius
+	slot.number_font = font(29, true)
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(slot)
+	return slot
+
+func money(cents):
+	return ("R$ %.2f" % (float(cents) / 100.0)).replace(".", ",")
+
+func refresh(message = ""):
+	speed_button.text = "VELOCIDADE " + str(pow(2, speed_index + 1)) + "×"
+	sound_button.text = "SOM ON" if sound_enabled else "SOM OFF"
+	if message != "":
+		status_message = message
+		status_time = 0.0
+	status_label.text = status_message
+	credit_label.text = str(game.credits)
+	credit_label.add_font_override("font", font(46 if game.credits < 100000 else 35, true))
+	bet_label.text = str(game.bet)
+	denomination_label.text = "CRÉDITO " + money(game.denomination)
+	var active = game.phase == "drawing" or game.phase == "extras"
+	minus_button.disabled = active or menu_open or game.bet <= 1
+	plus_button.disabled = active or menu_open or game.bet >= 20
+	menu_button.disabled = active
+	cards_button.disabled = active or extra_animating or menu_open
+	minus_button.modulate.a = 0.4 if minus_button.disabled else 1.0
+	plus_button.modulate.a = 0.4 if plus_button.disabled else 1.0
+	play_button.disabled = game.phase == "drawing" or extra_animating or menu_open or not true in game.card_enabled
+	play_cover.visible = game.phase == "drawing" or game.phase == "extras"
+	play_caption.text = "SORTEANDO" if game.phase == "drawing" else "FINALIZAR"
+	play_button.hint_tooltip = "Encerrar sem comprar mais extras" if game.phase == "extras" else "Jogar por " + money(game.bet * game.denomination)
+	extra_button.disabled = game.phase != "extras" or extra_animating or game.credits < game.bet or menu_open
+	extra_caption.text = "COMPRAR EXTRA • " + money(game.bet * game.denomination) if game.phase == "extras" else ""
+	if game.phase == "extras" and game.credits < game.bet:
+		extra_caption.text = "SALDO INSUFICIENTE"
+	count_label.text = "APOSTA " + money(game.bet * game.denomination)
+	var total = 0
+	for c in range(4):
+		card_buttons[c].disabled = active or menu_open or extra_animating
+		card_buttons[c].text = "" if game.card_enabled[c] else "FECHADA\nToque para abrir"
+		card_buttons[c].add_stylebox_override("normal", StyleBoxEmpty.new() if game.card_enabled[c] else style(Color("21122f")))
+		card_buttons[c].add_stylebox_override("disabled", StyleBoxEmpty.new() if game.card_enabled[c] else style(Color("21122f")))
+		if game.card_enabled[c]:
+			total += game.matches(game.cards[c])
+		for n in range(15):
+			var hit = game.cards[c][n] in game.drawn
+			if hit:
+				var tint = colors[c]
+				tint.a = 0.48
+				cells[c][n][0].add_stylebox_override("panel", style(tint, colors[c].darkened(0.2), 3))
+			else:
+				cells[c][n][0].add_stylebox_override("panel", StyleBoxEmpty.new())
+			cells[c][n][1].text = "%02d" % game.cards[c][n]
+	for i in range(3):
+		pots[i].set_fill(float(total) / max(15.0, game.card_enabled.count(true) * 15.0))
+	for n in range(40):
+		var slot = initial_balls[n] if n < 30 else extra_balls[n - 30]
+		slot.set_number(game.drawn[n] if n < game.drawn.size() else 0, n == game.drawn.size() - 1)
+	update()
+	_publish_browser_state()
+
+func change_cards():
+	if menu_open or extra_animating:
+		return
+	if game.change_cards():
+		audio.play_cue("cards")
+		machine.reset()
+		last_number = 0
+		win_age = -1.0
+		refresh("Novas cartelas! Toque em JOGAR para sortear com estes números.")
+
+func _browser_command(arguments):
+	if arguments.empty():
+		return
+	var command = str(arguments[0])
+	if command.begins_with("card:"):
+		toggle_card(int(command.substr(5)))
+		return
+	match str(arguments[0]):
+		"speed":
+			cycle_speed()
+		"sound":
+			toggle_sound()
+		"play":
+			if not play_button.disabled:
+				play()
+		"cards":
+			change_cards()
+		"extra":
+			if not extra_button.disabled:
+				buy_extra()
+		"minus":
+			decrease_bet()
+		"plus":
+			increase_bet()
+		"coin10":
+			coin_ten()
+		"coin25":
+			coin_twentyfive()
+		"reset":
+			reset_demo()
+
+func _publish_browser_state():
+	if not OS.has_feature("JavaScript"):
+		return
+	var state = {
+		"phase": game.phase,
+		"cards": game.cards,
+		"card_enabled": game.card_enabled,
+		"speed": pow(2, speed_index + 1),
+		"sound": sound_enabled,
+		"drawn": game.drawn,
+		"credits": game.credits,
+		"bet": game.bet,
+		"denomination": game.denomination,
+		"extras": game.extras_bought,
+		"status": status_message,
+		"can_play": not play_button.disabled,
+		"can_cards": not cards_button.disabled,
+		"can_extra": not extra_button.disabled,
+		"can_configure": game._can_configure() and not extra_animating and not menu_open,
+		"jackpot_won": game.jackpot_won
+	}
+	JavaScript.eval("window.onPotionState && window.onPotionState(" + JSON.print(state) + ");", true)
+
+func play():
+	if menu_open or extra_animating:
+		return
+	if game.phase == "extras":
+		game.finish_round()
+		refresh("Rodada encerrada. Toque em JOGAR para começar outra.")
+	elif game.start_round():
+		audio.play_cue("start")
+		machine.reset()
+		last_number = 0
+		win_age = -1.0
+		machine.set_spinning(true)
+		timer.start()
+		refresh("Misturando as bolas… 30 sorteios incluídos na aposta.")
+	else:
+		refresh("Saldo insuficiente. Recarregue os créditos de demonstração no menu.")
+
+func draw_ball():
+	var n = game.draw_next()
+	if n <= 0:
+		return
+	machine.reveal_ball(n)
+	audio.play_cue("ball")
+	last_number = n
+	hit_age = 0.0
+	if game.phase != "drawing":
+		timer.stop()
+		machine.set_spinning(false)
+		if game.jackpot_won:
+			audio.play_cue("win")
+			win_age = 0.0
+		refresh("ACUMULADO! Você ganhou R$ 5.000,00!" if game.jackpot_won else "30 bolas sorteadas. Toque nas extras para comprar ou em FINALIZAR.")
+	else:
+		refresh("BOLA %02d   •   %d DE 30" % [n, game.drawn.size()])
+
+func buy_extra():
+	if extra_animating or menu_open:
+		return
+	var n = game.buy_extra()
+	if n > 0:
+		audio.play_cue("extra")
+		extra_animating = true
+		machine.set_spinning(true)
+		machine.reveal_ball(n)
+		last_number = n
+		hit_age = 0.0
+		extra_timer.start()
+		refresh("EXTRA %d DE 10   •   BOLA %02d" % [game.extras_bought, n])
+	else:
+		refresh("Não foi possível comprar a bola extra.")
+
+func extra_animation_done():
+	extra_animating = false
+	machine.set_spinning(false)
+	refresh("40 bolas sorteadas. Rodada concluída!" if game.phase == "finished" else "Toque nas extras para comprar mais uma ou em FINALIZAR.")
+
+func decrease_bet():
+	if not menu_open:
+		game.set_bet(game.bet - 1)
+	refresh()
+
+func increase_bet():
+	if not menu_open:
+		game.set_bet(game.bet + 1)
+	refresh()
+
+func _process(delta):
+	hit_age += delta
+	status_time += delta
+	if win_age >= 0:
+		win_age += delta
+	update()
+
+func build_menu():
+	menu_shade = ColorRect.new()
+	menu_shade.rect_size = Vector2(1024, 1536)
+	menu_shade.color = Color(0.012, 0, 0.025, 0.85)
+	menu_shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(menu_shade)
+	menu_shade.hide()
+	settings = Panel.new()
+	settings.rect_position = Vector2(132, 390)
+	settings.rect_size = Vector2(760, 755)
+	settings.add_stylebox_override("panel", style(Color("190926"), gold, 24))
+	add_child(settings)
+	label_at("CONFIGURAÇÕES", Rect2(30, 26, 700, 58), 40, gold, true, settings)
+	settings_coin = label_at("", Rect2(30, 96, 700, 40), 23, Color("ffe7b3"), false, settings)
+	coin_buttons.append(button("R$ 0,10", Rect2(70, 155, 285, 64), "coin_ten", Color("165e25"), settings))
+	coin_buttons.append(button("R$ 0,25", Rect2(405, 155, 285, 64), "coin_twentyfive", Color("164e65"), settings))
+	label_at("COMO JOGAR", Rect2(30, 251, 700, 38), 29, gold, true, settings)
+	label_at("Uma aposta de 1 a 20 créditos joga as quatro cartelas.\nSão 30 bolas iniciais entre 75 números, sem repetição.\nVocê pode comprar até 10 extras pelo valor da aposta.\nCartela cheia até a 30ª bola: acumulado de R$ 5.000,00.\nAs extras não dão direito ao acumulado.", Rect2(30, 303, 700, 161), 21, Color("f7e7d9"), false, settings)
+	label_at("Mini, Major e Free Games: potes visuais nesta versão.\nDemonstração com créditos fictícios e saldo não persistente.", Rect2(30, 490, 700, 54), 17, Color("c0a8d0"), false, settings)
+	button("RECARREGAR 1.000 CRÉDITOS", Rect2(70, 574, 620, 58), "reset_demo", Color("46205a"), settings)
+	button("VOLTAR AO JOGO", Rect2(70, 664, 620, 58), "close_menu", Color("165e25"), settings)
+	settings.hide()
+
+func open_menu():
+	if game.phase == "drawing" or game.phase == "extras" or extra_animating:
+		return
+	menu_open = true
+	settings_coin.text = "VALOR DO CRÉDITO ATUAL: " + money(game.denomination)
+	menu_shade.show()
+	settings.show()
+	refresh()
+
+func close_menu():
+	menu_open = false
+	settings.hide()
+	menu_shade.hide()
+	refresh()
+
+func coin_ten():
+	if game.set_denomination(10):
+		save_settings()
+		refresh("Moeda selecionada: R$ 0,10 por crédito.")
+	close_menu()
+
+func coin_twentyfive():
+	if game.set_denomination(25):
+		save_settings()
+		refresh("Moeda selecionada: R$ 0,25 por crédito.")
+	close_menu()
+
+func reset_demo():
+	if game.reset_demo():
+		machine.reset()
+		last_number = 0
+		win_age = -1.0
+		refresh("Saldo de demonstração recarregado.")
+	close_menu()
+
+func save_settings():
+	var config = ConfigFile.new()
+	config.set_value("game", "denomination", game.denomination)
+	config.set_value("game", "speed_index", speed_index)
+	config.set_value("game", "sound", sound_enabled)
+	config.save("user://settings.cfg")
+
+func load_settings():
+	var config = ConfigFile.new()
+	if config.load("user://settings.cfg") == OK:
+		game.set_denomination(int(config.get_value("game", "denomination", 10)))
+		speed_index = int(clamp(int(config.get_value("game", "speed_index", 1)), 0, 2))
+		sound_enabled = bool(config.get_value("game", "sound", true))
+	speed = SPEEDS[speed_index]
+
+func ignore_card_click():
+	pass
+
+func toggle_card(index):
+	if menu_open or extra_animating:
+		return
+	if game.toggle_card(index):
+		audio.play_cue("open" if game.card_enabled[index] else "close")
+		refresh("Cartela %d %s." % [index + 1, "aberta" if game.card_enabled[index] else "fechada"])
+
+func apply_speed():
+	speed = SPEEDS[speed_index]
+	timer.wait_time = speed
+	extra_timer.wait_time = speed
+	machine.reveal_duration = speed * 0.72
+	machine.set_speed(pow(2, speed_index))
+	if not timer.is_stopped():
+		timer.start()
+
+func cycle_speed():
+	speed_index = (speed_index + 1) % SPEEDS.size()
+	apply_speed()
+	save_settings()
+	refresh()
+
+func toggle_sound():
+	sound_enabled = not sound_enabled
+	audio.set_enabled(sound_enabled)
+	audio.play_cue("bet")
+	save_settings()
+	refresh()
+
+func _unhandled_key_input(event):
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.scancode == KEY_ESCAPE:
+			if menu_open:
+				close_menu()
+			else:
+				open_menu()
+		if event.scancode == KEY_SPACE and not play_button.disabled:
+			play()
